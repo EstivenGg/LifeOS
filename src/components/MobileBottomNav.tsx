@@ -46,21 +46,25 @@ function Tab({ to, icon: Icon, label, end }: TabProps) {
       to={to}
       end={end}
       aria-label={label}
-      className="flex-1 flex flex-col items-center justify-end pb-2 gap-[3px] min-h-[56px] focus-visible:outline-none"
+      className="flex-1 flex items-center justify-center h-full focus-visible:outline-none"
     >
       {({ isActive }) => (
-        <>
-          <motion.div
-            animate={{ y: isActive ? -2 : 0, scale: isActive ? 1.13 : 1 }}
-            transition={{ type: 'spring', stiffness: 600, damping: 30 }}
-            className={`w-9 h-[26px] flex items-center justify-center rounded-xl transition-colors duration-150 ${isActive ? 'bg-accent/20' : ''}`}
-          >
-            <Icon size={20} className={`transition-colors duration-150 ${isActive ? 'text-accent' : 'text-white/30'}`} />
-          </motion.div>
-          <span className={`text-[9px] font-semibold leading-none tracking-wide transition-colors duration-150 ${isActive ? 'text-accent' : 'text-white/25'}`}>
+        <div className="relative flex flex-col items-center justify-center gap-[3px] w-full h-full">
+          {isActive && (
+            <motion.div
+              layoutId="bottom-tab-bg"
+              className="absolute inset-x-1 inset-y-2 rounded-2xl bg-accent/12"
+              transition={{ type: 'spring', stiffness: 500, damping: 38 }}
+            />
+          )}
+          <Icon
+            size={19}
+            className={`relative z-10 transition-colors duration-150 ${isActive ? 'text-accent' : 'text-white/35'}`}
+          />
+          <span className={`relative z-10 text-[9px] font-bold leading-none tracking-wide transition-colors duration-150 ${isActive ? 'text-accent' : 'text-white/28'}`}>
             {label}
           </span>
-        </>
+        </div>
       )}
     </NavLink>
   )
@@ -180,7 +184,7 @@ export function MobileBottomNav() {
               {/* Theme selector */}
               <div
                 className="px-5 pt-3 pb-3 border-t border-white/[0.05] flex flex-col items-center gap-2.5"
-                style={{ paddingBottom: 'calc(72px + max(var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)), 8px))' }}
+                style={{ paddingBottom: 'calc(104px + max(env(safe-area-inset-bottom, 0px), 10px))' }}
               >
                 <p className="text-[9px] font-black text-white/20 uppercase tracking-[0.15em]">Tema de color</p>
                 <ThemeSelector />
@@ -191,69 +195,66 @@ export function MobileBottomNav() {
         )}
       </AnimatePresence>
 
-      {/* ── Bottom nav bar — z-[70] always on top ────────────────────────── */}
+      {/* ── Floating pill nav — z-[70] always on top ───────────────────── */}
       <nav
         aria-label="Navegacion principal"
-        className="fixed bottom-0 inset-x-0 z-[70] md:hidden"
+        className="fixed bottom-0 inset-x-0 z-[70] md:hidden pointer-events-none"
       >
         <div
-          className="relative bg-surface-50/95 backdrop-blur-xl border-t border-white/[0.06]"
-          style={{ paddingBottom: 'max(var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)), 6px)' }}
+          className="pointer-events-auto mx-3 relative"
+          style={{ marginBottom: 'max(env(safe-area-inset-bottom, 0px), 10px)' }}
         >
-          <div className="flex items-end h-[58px] px-1 max-w-md mx-auto">
+          {/* FAB — floats above pill */}
+          <div className="absolute left-1/2 -translate-x-1/2 -top-[26px] z-20">
+            <motion.button
+              type="button"
+              onClick={() => setOpen(v => !v)}
+              aria-expanded={open}
+              aria-haspopup="dialog"
+              aria-label={open ? 'Cerrar menu' : 'Abrir todas las secciones'}
+              className="w-[52px] h-[52px] rounded-[18px] bg-accent flex items-center justify-center shadow-[0_8px_24px_rgb(var(--accent)/0.5)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/50 focus-visible:outline-offset-2"
+              whileTap={{ scale: 0.85 }}
+              transition={{ type: 'spring', stiffness: 600, damping: 25 }}
+            >
+              <span
+                className="absolute inset-0 rounded-[18px] pointer-events-none"
+                style={{ background: 'linear-gradient(160deg, rgba(255,255,255,0.22) 0%, transparent 55%)' }}
+              />
+              <AnimatePresence mode="wait" initial={false}>
+                {open ? (
+                  <motion.span
+                    key="x"
+                    initial={{ rotate: -90, opacity: 0, scale: 0.5 }}
+                    animate={{ rotate: 0, opacity: 1, scale: 1 }}
+                    exit={{ rotate: 90, opacity: 0, scale: 0.5 }}
+                    transition={{ type: 'spring', stiffness: 600, damping: 28 }}
+                    className="relative z-10"
+                  >
+                    <X size={21} className="text-white" strokeWidth={2.5} />
+                  </motion.span>
+                ) : (
+                  <motion.span
+                    key="grid"
+                    initial={{ rotate: 90, opacity: 0, scale: 0.5 }}
+                    animate={{ rotate: 0, opacity: 1, scale: 1 }}
+                    exit={{ rotate: -90, opacity: 0, scale: 0.5 }}
+                    transition={{ type: 'spring', stiffness: 600, damping: 28 }}
+                    className="relative z-10"
+                  >
+                    <LayoutGrid size={21} className="text-white" />
+                  </motion.span>
+                )}
+              </AnimatePresence>
+            </motion.button>
+          </div>
 
-            {/* Left 2 tabs */}
+          {/* Pill */}
+          <div className="bg-surface-50/97 backdrop-blur-xl rounded-[26px] border border-white/[0.08] shadow-[0_8px_40px_rgba(0,0,0,0.5),0_0_0_1px_rgba(255,255,255,0.03)] h-[62px] flex items-center px-1">
             <Tab {...QUICK[0]} />
             <Tab {...QUICK[1]} />
-
-            {/* Center FAB */}
-            <div className="flex-none w-[72px] flex justify-center items-center relative">
-              <motion.button
-                type="button"
-                onClick={() => setOpen(v => !v)}
-                aria-expanded={open}
-                aria-haspopup="dialog"
-                aria-label={open ? 'Cerrar menu' : 'Abrir todas las secciones'}
-                className="absolute -top-[22px] w-[52px] h-[52px] rounded-[16px] bg-accent flex items-center justify-center shadow-xl shadow-accent/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/50 focus-visible:outline-offset-2"
-                whileTap={{ scale: 0.85 }}
-                transition={{ type: 'spring', stiffness: 600, damping: 25 }}
-              >
-                <span
-                  className="absolute inset-0 rounded-[16px] pointer-events-none"
-                  style={{ background: 'linear-gradient(160deg, rgba(255,255,255,0.22) 0%, transparent 55%)' }}
-                />
-                <AnimatePresence mode="wait" initial={false}>
-                  {open ? (
-                    <motion.span
-                      key="x"
-                      initial={{ rotate: -90, opacity: 0, scale: 0.5 }}
-                      animate={{ rotate: 0, opacity: 1, scale: 1 }}
-                      exit={{ rotate: 90, opacity: 0, scale: 0.5 }}
-                      transition={{ type: 'spring', stiffness: 600, damping: 28 }}
-                      className="relative z-10"
-                    >
-                      <X size={21} className="text-white" strokeWidth={2.5} />
-                    </motion.span>
-                  ) : (
-                    <motion.span
-                      key="grid"
-                      initial={{ rotate: 90, opacity: 0, scale: 0.5 }}
-                      animate={{ rotate: 0, opacity: 1, scale: 1 }}
-                      exit={{ rotate: -90, opacity: 0, scale: 0.5 }}
-                      transition={{ type: 'spring', stiffness: 600, damping: 28 }}
-                      className="relative z-10"
-                    >
-                      <LayoutGrid size={21} className="text-white" />
-                    </motion.span>
-                  )}
-                </AnimatePresence>
-              </motion.button>
-            </div>
-
-            {/* Right 2 tabs */}
+            <div className="w-[64px] shrink-0" />
             <Tab {...QUICK[2]} />
             <Tab {...QUICK[3]} />
-
           </div>
         </div>
       </nav>

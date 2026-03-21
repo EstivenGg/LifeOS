@@ -36,7 +36,7 @@ export function Layout() {
           pb-[88px] gives clearance for the mobile bottom nav bar.
           md:pb-8 restores normal desktop padding.
         */}
-        <div className="p-4 md:p-8 flex-1 pb-[88px] md:pb-8">
+        <div className="p-4 md:p-8 flex-1 pb-[96px] md:pb-8">
           <Outlet />
         </div>
       </main>
