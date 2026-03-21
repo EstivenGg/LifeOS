@@ -1,0 +1,345 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   THEME TOKENS
+   All values are space-separated RGB channels so Tailwind can apply opacity
+   modifiers: rgb(var(--accent) / 0.2)  ✓
+   Plain CSS also uses the CSS Color Level 4 syntax: rgb(R G B / alpha)
+────────────────────────────────────────────────────────────────────────────── */
+@layer base {
+
+  /* ── Violet (default) ───────────────────────────────────────────────── */
+  :root,
+  [data-theme="violet"] {
+    --accent:       124 91 245;   /* #7c5bf5 */
+    --accent-light: 155 127 255;  /* #9b7fff */
+    --accent-dark:   92  61 212;  /* #5c3dd4 */
+
+    --surface:      15  15  20;   /* #0f0f14 */
+    --surface-50:   22  22  29;   /* #16161d */
+    --surface-100:  28  28  38;   /* #1c1c26 */
+    --surface-200:  35  35  47;   /* #23232f */
+    --surface-300:  42  42  56;   /* #2a2a38 */
+    --surface-400:  51  51  68;   /* #333344 */
+  }
+
+  /* ── Blue ───────────────────────────────────────────────────────────── */
+  [data-theme="blue"] {
+    --accent:        59 130 246;  /* #3b82f6 */
+    --accent-light:  96 165 250;  /* #60a5fa */
+    --accent-dark:   37  99 235;  /* #2563eb */
+
+    --surface:       10  14  26;  /* #0a0e1a */
+    --surface-50:    14  20  38;  /* #0e1426 */
+    --surface-100:   18  28  50;  /* #121c32 */
+    --surface-200:   23  36  64;  /* #172440 */
+    --surface-300:   29  46  79;  /* #1d2e4f */
+    --surface-400:   37  58  96;  /* #253a60 */
+  }
+
+  /* ── Red ────────────────────────────────────────────────────────────── */
+  [data-theme="red"] {
+    --accent:       239  68  68;  /* #ef4444 */
+    --accent-light: 248 113 113;  /* #f87171 */
+    --accent-dark:  220  38  38;  /* #dc2626 */
+
+    --surface:       20  10  10;  /* #140a0a */
+    --surface-50:    28  14  14;  /* #1c0e0e */
+    --surface-100:   37  18  18;  /* #251212 */
+    --surface-200:   46  22  22;  /* #2e1616 */
+    --surface-300:   56  27  27;  /* #381b1b */
+    --surface-400:   67  33  33;  /* #432121 */
+  }
+
+  /* ── Green ──────────────────────────────────────────────────────────── */
+  [data-theme="green"] {
+    --accent:        34 197  94;  /* #22c55e */
+    --accent-light:  74 222 128;  /* #4ade80 */
+    --accent-dark:   22 163  74;  /* #16a34a */
+
+    --surface:       10  18  12;  /* #0a120c */
+    --surface-50:    13  24  16;  /* #0d1810 */
+    --surface-100:   17  31  21;  /* #111f15 */
+    --surface-200:   21  39  27;  /* #15271b */
+    --surface-300:   26  49  33;  /* #1a3121 */
+    --surface-400:   32  60  40;  /* #203c28 */
+  }
+
+  /* ── Amber ──────────────────────────────────────────────────────────── */
+  [data-theme="amber"] {
+    --accent:       245 158  11;  /* #f59e0b */
+    --accent-light: 251 191  36;  /* #fbbf24 */
+    --accent-dark:  217 119   6;  /* #d97706 */
+
+    --surface:       20  15   8;  /* #140f08 */
+    --surface-50:    28  21  11;  /* #1c150b */
+    --surface-100:   37  27  14;  /* #251b0e */
+    --surface-200:   46  34  18;  /* #2e2212 */
+    --surface-300:   57  42  22;  /* #392a16 */
+    --surface-400:   69  51  27;  /* #45331b */
+  }
+
+  /* ─────────────────────────────────────────────────────────────────────
+     GLOBAL BASE STYLES
+  ───────────────────────────────────────────────────────────────────── */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(var(--accent) / 0.3) transparent;
+  }
+
+  *::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background: rgb(var(--accent) / 0.3);
+    border-radius: 9999px;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background: rgb(var(--accent) / 0.5);
+  }
+
+  body {
+    overflow-x: hidden;
+  }
+
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  input[type="number"] {
+    -moz-appearance: textfield;
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-surface-100/70 backdrop-blur-2xl border border-white/[0.05] rounded-[24px] shadow-[0_8px_32px_rgba(0,0,0,0.15)];
+  }
+
+  .glass-card-hover {
+    @apply glass-card hover:border-white/[0.1] hover:bg-surface-100 ring-1 ring-transparent hover:ring-white/[0.02] transition-all duration-300;
+  }
+
+  .glow-accent {
+    box-shadow:
+      0 0 40px rgb(var(--accent) / 0.1),
+      0 0 80px rgb(var(--accent) / 0.05);
+  }
+
+  .input-field {
+    @apply w-full bg-surface-200/60 border border-white/[0.06] rounded-xl px-4 py-2.5 text-sm text-white placeholder-white/30 focus:outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/20 transition-all duration-200;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 bg-accent hover:bg-accent-light text-white font-medium text-sm px-5 py-2.5 rounded-xl transition-all duration-200 active:scale-[0.97];
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 bg-surface-200 hover:bg-surface-300 text-white/80 hover:text-white font-medium text-sm px-5 py-2.5 rounded-xl border border-white/[0.06] transition-all duration-200 active:scale-[0.97];
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 text-white/50 hover:text-white hover:bg-surface-200/60 font-medium text-sm px-3 py-2 rounded-lg transition-all duration-200;
+  }
+
+  .premium-sheet-scroll {
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .premium-wheel-scroll,
+  .disable-scrollbars,
+  .hide-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .premium-wheel-scroll::-webkit-scrollbar,
+  .disable-scrollbars::-webkit-scrollbar,
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   FULLCALENDAR OVERRIDES — premium native-app feel
+────────────────────────────────────────────────────────────────────────────── */
+.fc {
+  --fc-border-color:              rgba(255, 255, 255, 0.04);
+  --fc-button-bg-color:           rgb(var(--surface-200));
+  --fc-button-border-color:       rgba(255, 255, 255, 0.06);
+  --fc-button-hover-bg-color:     rgb(var(--surface-300));
+  --fc-button-hover-border-color: rgb(var(--accent) / 0.3);
+  --fc-button-active-bg-color:    rgb(var(--accent));
+  --fc-button-active-border-color:rgb(var(--accent));
+  --fc-today-bg-color:            rgb(var(--accent) / 0.10);
+  --fc-page-bg-color:             transparent;
+  --fc-neutral-bg-color:          rgb(var(--surface-50) / 0.5);
+  --fc-event-bg-color:            rgb(var(--accent));
+  --fc-event-border-color:        rgb(var(--accent));
+}
+
+.fc .fc-daygrid-day-number {
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 6px 8px;
+}
+
+.fc .fc-col-header-cell-cushion {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 8px 0;
+}
+
+.fc .fc-button {
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 0.625rem;
+  padding: 0.4rem 0.85rem;
+  transition: all 0.15s ease;
+  box-shadow: none !important;
+}
+
+.fc .fc-toolbar-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: white;
+  text-transform: capitalize;
+}
+
+.fc .fc-daygrid-day {
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.fc .fc-daygrid-day:hover {
+  background: rgb(var(--accent) / 0.06);
+}
+
+.fc .fc-daygrid-day-frame {
+  min-height: 72px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.fc .fc-day-today .fc-daygrid-day-frame {
+  background: rgb(var(--accent) / 0.08);
+  border-radius: 8px;
+}
+
+.fc .fc-day-today .fc-daygrid-day-number {
+  color: rgb(var(--accent));
+  font-weight: 700;
+}
+
+.fc .fc-daygrid-day-events {
+  margin: 1px 2px 2px;
+}
+
+.fc .fc-daygrid-event.fc-task-event {
+  margin-top: 3px;
+  border-radius: 9px;
+  border-width: 1px;
+  padding: 0;
+  font-size: 0.68rem;
+  font-weight: 600;
+  line-height: 1.2;
+  background: rgba(124, 91, 245, 0.22);
+  border-color: rgba(124, 91, 245, 0.45);
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.fc .fc-daygrid-event.fc-task-event .fc-event-main {
+  padding: 0;
+}
+
+.fc .fc-task-chip {
+  display: flex;
+  align-items: center;
+  min-height: 18px;
+  padding: 2px 6px;
+}
+
+.fc .fc-task-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fc .fc-daygrid-event.fc-task-event.status-in_progress {
+  background: rgba(56, 189, 248, 0.2);
+  border-color: rgba(56, 189, 248, 0.45);
+}
+
+.fc .fc-daygrid-event.fc-task-event.status-completed {
+  background: rgba(34, 197, 94, 0.2);
+  border-color: rgba(34, 197, 94, 0.45);
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.fc .fc-daygrid-event.fc-task-event.status-completed .fc-task-title {
+  text-decoration: line-through;
+}
+
+/* Softer table borders */
+.fc td, .fc th {
+  border-color: rgba(255, 255, 255, 0.04) !important;
+}
+
+/* Mobile compactness */
+@media (max-width: 767px) {
+  .fc .fc-daygrid-day-frame {
+    min-height: 52px;
+  }
+  .fc .fc-daygrid-day-number {
+    font-size: 0.7rem;
+    padding: 4px 6px;
+  }
+  .fc .fc-toolbar {
+    gap: 0.5rem;
+  }
+  .fc .fc-toolbar-title {
+    font-size: 0.95rem;
+  }
+}
+
+/* ── Task dot indicators in day cells ────────────────────────────────────── */
+.fc-daycell-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  width: 100%;
+}
+
+.fc-task-day-dots {
+  display: flex;
+  gap: 3px;
+  padding: 0 6px 4px;
+  justify-content: flex-end;
+}
+
+.fc-task-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.fc-task-dot.dot-overdue { background: rgb(248 113 113 / 0.85); }
+.fc-task-dot.dot-pending { background: rgb(var(--accent) / 0.85); }
+.fc-task-dot.dot-done    { background: rgb(52 211 153 / 0.75); }

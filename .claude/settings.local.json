@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run build)",
+      "Bash(xargs grep -l \"interface JournalEntry\")",
+      "Bash(xargs grep -l \"JournalEntry\\\\s*=\")",
+      "Bash(npx tsc:*)"
+    ]
+  }
+}
