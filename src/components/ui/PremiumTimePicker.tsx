@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ChevronDown, Clock3, X } from 'lucide-react'
 
@@ -212,10 +213,9 @@ export function PremiumTimePicker({
   const setNowRounded = useCallback(() => {
     const now = new Date()
     const rounded = roundToStep(now.getHours(), now.getMinutes(), minuteStep)
-    setDraftHour(rounded.hour)
-    setDraftMinute(rounded.minute)
-    setSyncKey(key => key + 1)
-  }, [minuteStep])
+    onChange(formatTime(rounded.hour, rounded.minute))
+    setOpen(false)
+  }, [minuteStep, onChange])
 
   const clearSelection = useCallback(() => {
     onChange(undefined)
@@ -260,114 +260,118 @@ export function PremiumTimePicker({
         <ChevronDown size={16} className="text-white/35 shrink-0" />
       </button>
 
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            className="fixed inset-0 z-[80]"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={closeSheet}
-          >
-            <div className="absolute inset-0 bg-black/65 backdrop-blur-sm" />
+      {typeof document !== 'undefined' && createPortal(
+        <AnimatePresence>
+          {open && (
+            <div className="fixed inset-0 z-[100] isolate">
+              <motion.div
+                className="absolute inset-0"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={closeSheet}
+              >
+                <div className="absolute inset-0 bg-black/65 backdrop-blur-sm" />
+              </motion.div>
 
-            <motion.div
-              role="dialog"
-              aria-modal="true"
-              aria-label={title}
-              initial={{ y: 34, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 28, opacity: 0 }}
-              transition={{ duration: 0.18, ease: 'easeOut' }}
-              onClick={event => event.stopPropagation()}
-              className="absolute inset-x-0 bottom-0 rounded-t-3xl border border-white/[0.06] bg-surface-100/95 backdrop-blur-xl shadow-2xl pb-[calc(env(safe-area-inset-bottom)+14px)]"
-            >
-              <div className="mx-auto mt-2 mb-3 h-1.5 w-12 rounded-full bg-white/15" />
+              <motion.div
+                role="dialog"
+                aria-modal="true"
+                aria-label={title}
+                initial={{ y: '100%' }}
+                animate={{ y: 0 }}
+                exit={{ y: '100%' }}
+                transition={{ type: 'spring', stiffness: 380, damping: 40, mass: 0.85 }}
+                className="absolute inset-x-0 bottom-0 rounded-t-3xl border-t border-white/[0.08] bg-surface-100 shadow-[0_-12px_40px_rgba(0,0,0,0.6)] pb-[calc(env(safe-area-inset-bottom)+14px)]"
+              >
+                <div className="mx-auto mt-3 mb-4 h-1 w-10 rounded-full bg-white/15" />
 
-              <div className="px-4 pb-4">
-                <div className="mb-3 flex items-center justify-between gap-2">
-                  <h3 className="text-sm font-semibold text-white/85">{title}</h3>
-                  <button
-                    type="button"
-                    onClick={closeSheet}
-                    aria-label="Cerrar"
-                    className="h-10 w-10 rounded-xl flex items-center justify-center text-white/50 hover:text-white hover:bg-white/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
-                  >
-                    <X size={18} />
-                  </button>
-                </div>
+                <div className="px-4 pb-4">
+                  <div className="mb-3 flex items-center justify-between gap-2 px-1">
+                    <h3 className="text-sm font-bold text-white/80 uppercase tracking-widest">{title}</h3>
+                    <button
+                      type="button"
+                      onClick={closeSheet}
+                      aria-label="Cerrar"
+                      className="h-8 w-8 rounded-full flex items-center justify-center text-white/40 hover:text-white bg-white/5 hover:bg-white/10 transition-colors"
+                    >
+                      <X size={16} strokeWidth={2.5} />
+                    </button>
+                  </div>
 
-                <div className="mb-3 flex items-center justify-center gap-2 rounded-2xl border border-white/[0.06] bg-surface-200/50 px-3 py-2 text-white/80">
-                  <Clock3 size={16} className="text-accent/90" />
-                  <span className="font-mono text-lg font-semibold tabular-nums">{preview}</span>
-                </div>
+                  <div className="mb-4 flex items-center justify-center gap-2 rounded-2xl border border-white/[0.06] bg-surface-200/50 px-3 py-2.5 text-white/80">
+                    <Clock3 size={16} className="text-accent/90" />
+                    <span className="font-mono text-xl font-bold tabular-nums">{preview}</span>
+                  </div>
 
-                <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-                  <WheelColumn
-                    values={hours}
-                    selectedValue={draftHour}
-                    onSelect={setDraftHour}
-                    syncKey={syncKey}
-                    label="Horas"
-                  />
-                  <span className="text-3xl text-white/45">:</span>
-                  <WheelColumn
-                    values={minuteValues}
-                    selectedValue={draftMinute}
-                    onSelect={setDraftMinute}
-                    syncKey={syncKey}
-                    label="Minutos"
-                  />
-                </div>
+                  <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+                    <WheelColumn
+                      values={hours}
+                      selectedValue={draftHour}
+                      onSelect={setDraftHour}
+                      syncKey={syncKey}
+                      label="Horas"
+                    />
+                    <span className="text-3xl font-black text-white/30 mb-8">:</span>
+                    <WheelColumn
+                      values={minuteValues}
+                      selectedValue={draftMinute}
+                      onSelect={setDraftMinute}
+                      syncKey={syncKey}
+                      label="Minutos"
+                    />
+                  </div>
 
-                <div className={`mt-4 grid gap-2 ${allowClear ? 'grid-cols-4' : 'grid-cols-3'}`}>
-                  {allowClear && (
+                  <div className={`mt-5 grid gap-2 ${allowClear ? 'grid-cols-4' : 'grid-cols-3'}`}>
+                    {allowClear && (
+                      <motion.button
+                        whileTap={{ scale: 0.98 }}
+                        type="button"
+                        onClick={clearSelection}
+                        aria-label="Limpiar hora"
+                        className="min-h-[48px] rounded-[14px] border border-white/[0.08] bg-surface-200/60 px-2 text-[11px] font-bold text-white/60 hover:text-white uppercase tracking-wider"
+                      >
+                        Limpiar
+                      </motion.button>
+                    )}
+
                     <motion.button
                       whileTap={{ scale: 0.98 }}
                       type="button"
-                      onClick={clearSelection}
-                      aria-label="Limpiar hora"
-                      className="min-h-[44px] rounded-xl border border-white/[0.08] bg-surface-200/50 px-2 text-xs font-medium text-white/70 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
+                      onClick={setNowRounded}
+                      aria-label="Seleccionar hora actual"
+                      className="min-h-[48px] rounded-[14px] border border-white/[0.08] bg-surface-200/60 px-2 text-[11px] font-bold text-white/60 hover:text-white uppercase tracking-wider"
                     >
-                      Limpiar
+                      Ahora
                     </motion.button>
-                  )}
 
-                  <motion.button
-                    whileTap={{ scale: 0.98 }}
-                    type="button"
-                    onClick={setNowRounded}
-                    aria-label="Seleccionar hora actual"
-                    className="min-h-[44px] rounded-xl border border-white/[0.08] bg-surface-200/50 px-2 text-xs font-medium text-white/70 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
-                  >
-                    Ahora
-                  </motion.button>
+                    <motion.button
+                      whileTap={{ scale: 0.98 }}
+                      type="button"
+                      onClick={closeSheet}
+                      aria-label="Cancelar selección de hora"
+                      className="min-h-[48px] rounded-[14px] border border-white/[0.08] bg-surface-200/60 px-2 text-[11px] font-bold text-white/60 hover:text-white uppercase tracking-wider"
+                    >
+                      Cancelar
+                    </motion.button>
 
-                  <motion.button
-                    whileTap={{ scale: 0.98 }}
-                    type="button"
-                    onClick={closeSheet}
-                    aria-label="Cancelar selección de hora"
-                    className="min-h-[44px] rounded-xl border border-white/[0.08] bg-surface-200/50 px-2 text-xs font-medium text-white/70 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
-                  >
-                    Cancelar
-                  </motion.button>
-
-                  <motion.button
-                    whileTap={{ scale: 0.98 }}
-                    type="button"
-                    onClick={applySelection}
-                    aria-label="Confirmar selección de hora"
-                    className="min-h-[44px] rounded-xl border border-accent/40 bg-accent/20 px-2 text-xs font-semibold text-white hover:bg-accent/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
-                  >
-                    Listo
-                  </motion.button>
+                    <motion.button
+                      whileTap={{ scale: 0.98 }}
+                      type="button"
+                      onClick={applySelection}
+                      aria-label="Confirmar selección de hora"
+                      className="min-h-[48px] rounded-[14px] border border-accent/40 bg-accent/20 px-2 text-[12px] font-black text-white hover:bg-accent/30 uppercase tracking-wider shadow-lg shadow-accent/20"
+                    >
+                      Listo
+                    </motion.button>
+                  </div>
                 </div>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
     </div>
   )
 }

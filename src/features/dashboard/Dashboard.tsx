@@ -166,7 +166,7 @@ export function Dashboard() {
     const isAdv = s.advOverrides?.[id] ?? advanced[id]
     switch (id) {
       case 'mood':       return { label: 'Mood',       value: s.mood ? `${s.mood}/5` : '—',                        navSection: 'mood'       }
-      case 'habits':     return { label: 'Hábitos',    value: `${totalDone}/${totalMax}`,                           navSection: 'habits'     }
+      case 'habits':     return { label: 'Hábitos',    value: `${s.checklistDone}/${s.checklistTotal}`,                           navSection: 'habits'     }
       case 'sleep': {
         const QL: Record<number, string> = { 1: 'Mal', 2: 'Regular', 3: 'Bien', 4: 'Súper' }
         if (isAdv) return { label: 'Sueño',      value: s.sleepHours ? `${s.sleepHours}h` : '—',               navSection: 'sleep' }

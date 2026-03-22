@@ -88,7 +88,7 @@ export function MobileBottomNav() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-[65] bg-black/60 backdrop-blur-sm md:hidden"
+            className="fixed inset-0 z-[65] bg-surface/80 backdrop-blur-md md:hidden"
             onClick={close}
             aria-hidden="true"
           />
@@ -109,7 +109,7 @@ export function MobileBottomNav() {
             aria-label="Todas las secciones"
             className="fixed inset-x-0 bottom-0 z-[68] md:hidden"
           >
-            <div className="bg-surface-100/98 backdrop-blur-2xl rounded-t-[32px] border-t border-white/[0.08] shadow-[0_-8px_40px_rgba(0,0,0,0.5)] overflow-hidden">
+            <div className="bg-surface-100 rounded-t-[32px] border-t border-white/[0.08] shadow-[0_-12px_40px_rgba(0,0,0,0.6)] overflow-hidden">
 
               {/* Handle */}
               <div className="flex justify-center pt-3 pb-1" aria-hidden="true">
@@ -130,7 +130,7 @@ export function MobileBottomNav() {
 
               {/* Nav grid */}
               <nav aria-label="Navegacion completa" className="grid grid-cols-4 gap-1.5 px-3 pb-3">
-                {ALL_NAV.map((item, i) => (
+                {ALL_NAV.map((item) => (
                   <NavLink
                     key={item.to}
                     to={item.to}
@@ -140,10 +140,7 @@ export function MobileBottomNav() {
                     className="rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
                   >
                     {({ isActive }) => (
-                      <motion.div
-                        initial={{ opacity: 0, y: 14, scale: 0.85 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        transition={{ type: 'spring', stiffness: 480, damping: 32, delay: i * 0.018 }}
+                      <div
                         className={`flex flex-col items-center gap-1.5 py-3 px-1 rounded-2xl transition-colors duration-150 ${
                           isActive ? '' : 'active:bg-surface-200/60'
                         }`}
@@ -175,7 +172,7 @@ export function MobileBottomNav() {
                             transition={{ type: 'spring', stiffness: 500, damping: 30 }}
                           />
                         )}
-                      </motion.div>
+                      </div>
                     )}
                   </NavLink>
                 ))}
@@ -249,7 +246,7 @@ export function MobileBottomNav() {
           </div>
 
           {/* Pill */}
-          <div className="bg-surface-50/97 backdrop-blur-xl rounded-[26px] border border-white/[0.08] shadow-[0_8px_40px_rgba(0,0,0,0.5),0_0_0_1px_rgba(255,255,255,0.03)] h-[62px] flex items-center px-1">
+          <div className="bg-surface-50/95 backdrop-blur-md rounded-[26px] border border-white/[0.08] shadow-[0_8px_40px_rgba(0,0,0,0.5),0_0_0_1px_rgba(255,255,255,0.03)] h-[62px] flex items-center px-1">
             <Tab {...QUICK[0]} />
             <Tab {...QUICK[1]} />
             <div className="w-[64px] shrink-0" />

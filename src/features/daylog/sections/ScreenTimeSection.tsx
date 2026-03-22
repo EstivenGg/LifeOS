@@ -148,12 +148,12 @@ export function ScreenTimeSection({ entry, isHorizontal, apps, sortedApps, impor
         {SyncBtn}
       </div>
 
-      {/* Two-column body */}
-      <div className="flex-1 flex gap-5 px-2 sm:px-6 min-h-0">
+      {/* Two-row body */}
+      <div className="flex-1 flex flex-col gap-5 px-2 sm:px-6 min-h-0 overflow-y-auto pb-4 premium-scrollbar">
 
-        {/* Left: Big time circle */}
-        <div className="flex flex-col items-center justify-center shrink-0">
-          <div className="relative w-36 h-36 flex items-center justify-center">
+        {/* Top: Big time circle */}
+        <div className="flex flex-col items-center justify-center shrink-0 mt-2">
+          <div className="relative w-32 h-32 sm:w-36 sm:h-36 flex items-center justify-center">
             <div className="absolute inset-0 rounded-full border-2 border-pink-400/15" />
             <div className="absolute inset-2 rounded-full border border-pink-400/5" />
             <motion.div
@@ -166,12 +166,12 @@ export function ScreenTimeSection({ entry, isHorizontal, apps, sortedApps, impor
               {totalMins > 0 ? (
                 <>
                   <div className="flex items-baseline gap-0.5">
-                    <span className="text-4xl font-black text-white tabular-nums">{Math.floor(totalMins / 60)}</span>
-                    <span className="text-base font-black text-pink-400/50">h</span>
+                    <span className="text-3xl sm:text-4xl font-black text-white tabular-nums">{Math.floor(totalMins / 60)}</span>
+                    <span className="text-sm sm:text-base font-black text-pink-400/50">h</span>
                   </div>
                   <div className="flex items-baseline gap-0.5">
-                    <span className="text-2xl font-black text-white/70 tabular-nums">{totalMins % 60}</span>
-                    <span className="text-xs font-black text-pink-400/40">m</span>
+                    <span className="text-xl sm:text-2xl font-black text-white/70 tabular-nums">{totalMins % 60}</span>
+                    <span className="text-[10px] sm:text-xs font-black text-pink-400/40">m</span>
                   </div>
                 </>
               ) : (
@@ -184,26 +184,28 @@ export function ScreenTimeSection({ entry, isHorizontal, apps, sortedApps, impor
               )}
             </div>
           </div>
-          <p className="text-[8px] font-black uppercase tracking-[0.2em] text-pink-400/40 mt-2">tiempo total</p>
+          <p className="text-[8px] font-black uppercase tracking-[0.2em] text-pink-400/40 mt-3">tiempo total</p>
         </div>
 
-        {/* Right: Top apps */}
-        <div className="flex-1 flex flex-col justify-center gap-2 min-h-0">
-          <p className="text-[9px] font-black uppercase tracking-[0.2em] text-white/20 shrink-0">Top apps</p>
+        {/* Bottom: Top apps */}
+        <div className="flex-1 flex flex-col justify-start gap-2 min-h-0">
+          <p className="text-[9px] font-black uppercase tracking-[0.2em] text-white/20 shrink-0 px-1">Top apps</p>
           {topApps.length === 0 ? (
-            <div className="flex-1 flex flex-col items-center justify-center text-center gap-2">
+            <div className="flex-1 flex flex-col items-center justify-center text-center gap-2 py-6 rounded-[20px] border border-white/5 bg-surface-200/20">
               <motion.div
                 animate={{ scale: [1, 1.05, 1], opacity: [0.15, 0.3, 0.15] }}
                 transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
               >
-                <Smartphone size={32} className="text-white/20" />
+                <Smartphone size={28} className="text-white/20" />
               </motion.div>
-              <p className="text-xs text-white/20">Sin datos de apps</p>
+              <p className="text-xs text-white/20 mt-1">Sin datos de apps</p>
             </div>
           ) : (
-            topApps.map((u, i) => (
-              <AppRow key={u.id} rank={i} app={apps.find(a => a.id === u.appId)} usage={u} total={totalMins} />
-            ))
+            <div className="flex flex-col gap-2 pb-2">
+              {topApps.map((u, i) => (
+                <AppRow key={u.id} rank={i} app={apps.find(a => a.id === u.appId)} usage={u} total={totalMins} />
+              ))}
+            </div>
           )}
         </div>
       </div>

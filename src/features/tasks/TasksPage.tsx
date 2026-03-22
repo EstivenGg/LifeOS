@@ -23,72 +23,12 @@ import {
   todayStr,
   toggleTaskStatus,
 } from './taskOperations'
+import { ListsView } from './components/ListsView'
 
-/* ─── Constants ─────────────────────────────────────────────────────────── */
+import { STATUS_CFG, LIST_COLORS, RECURRENCE_OPTIONS, SORT_OPTIONS, TASK_FOCUS_FILTER_OPTIONS, RECURRENCE_EDIT_SCOPE_OPTIONS, ViewTab, SortMode, CompletionVisibility, TaskFocusFilter, RecurrenceEditScope, parseQuickCapture } from './constants'
+import { TaskDetail } from './components/TaskDetail'
+import { TaskRow } from './components/TaskRow'
 
-const STATUS_CFG: Record<TaskStatus, { label: string; icon: typeof Circle; color: string }> = {
-  pending:     { label: 'Pendiente',   icon: Circle,       color: 'text-white/40' },
-  in_progress: { label: 'En progreso', icon: Clock,        color: 'text-amber-400' },
-  completed:   { label: 'Completada',  icon: CheckCircle2, color: 'text-emerald-400' },
-}
-
-const LIST_COLORS = ['#7c5bf5', '#3b82f6', '#ef4444', '#22c55e', '#f59e0b', '#ec4899', '#06b6d4', '#f97316']
-const RECURRENCE_OPTIONS = [
-  { value: '', label: 'No repetir' },
-  { value: 'daily', label: 'Diaria' },
-  { value: 'weekly', label: 'Semanal' },
-  { value: 'monthly', label: 'Mensual' },
-]
-const SORT_OPTIONS = [
-  { value: 'manual', label: 'Manual' },
-  { value: 'date', label: 'Fecha' },
-  { value: 'recent', label: 'Recientes' },
-]
-const TASK_FOCUS_FILTER_OPTIONS = [
-  { value: 'all', label: 'Sin filtro' },
-  { value: 'today', label: 'Vence hoy' },
-  { value: 'overdue', label: 'Vencidas' },
-  { value: 'scheduled', label: 'Programadas' },
-  { value: 'unassigned', label: 'Sin lista' },
-]
-
-const RECURRENCE_EDIT_SCOPE_OPTIONS = [
-  { value: 'single', label: 'Solo esta ocurrencia' },
-  { value: 'series', label: 'Serie desde aqui' },
-]
-
-type ViewTab = 'tasks' | 'lists'
-type SortMode = 'manual' | 'date' | 'recent'
-type CompletionVisibility = 'active' | 'completed' | 'all'
-type TaskFocusFilter = 'all' | 'today' | 'overdue' | 'scheduled' | 'unassigned'
-type RecurrenceEditScope = 'single' | 'series'
-
-/* ─── Smart capture parser ──────────────────────────────────────────────── */
-
-function parseQuickCapture(raw: string) {
-  let title = raw.trim()
-  let dueDate: string | undefined
-  const tags: string[] = []
-
-  title = title.replace(/#(\S+)/g, (_, tag) => { tags.push(tag); return '' })
-
-  const t = todayStr()
-  const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1)
-  const tomorrowStr = tomorrow.toISOString().slice(0, 10)
-  const dateKeywords: Record<string, string> = {
-    'hoy': t, 'today': t,
-    'manana': tomorrowStr, 'mañana': tomorrowStr, 'tomorrow': tomorrowStr,
-  }
-  for (const [key, val] of Object.entries(dateKeywords)) {
-    const regex = new RegExp(`\\b${key}\\b`, 'gi')
-    if (regex.test(title)) {
-      dueDate = val
-      title = title.replace(regex, '')
-    }
-  }
-
-  return { title: title.replace(/\s+/g, ' ').trim(), dueDate, tags: tags.length ? JSON.stringify(tags) : undefined }
-}
 
 /* ─── Recurring task generation ─────────────────────────────────────────── */
 
@@ -98,7 +38,6 @@ export function TasksPage() {
   const [tab, setTab] = useState<ViewTab>('tasks')
   const [tasks, setTasks] = useState<Task[]>([])
   const [lists, setLists] = useState<TaskList[]>([])
-  const [templates, setTemplates] = useState<ListTemplate[]>([])
   const [showFilters, setShowFilters] = useState(false)
   const [sortMode, setSortMode] = useState<SortMode>('manual')
   const [completionVisibility, setCompletionVisibility] = useState<CompletionVisibility>('active')
@@ -107,13 +46,12 @@ export function TasksPage() {
   // Modals
   const [taskModal, setTaskModal] = useState(false)
   const [listModal, setListModal] = useState(false)
-  const [templateModal, setTemplateModal] = useState(false)
   const [detailTask, setDetailTask] = useState<Task | null>(null)
   const [editingList, setEditingList] = useState<TaskList | null>(null)
   const [selectedListId, setSelectedListId] = useState<number | null>(null)
 
   // Confirm delete
-  const [confirmDelete, setConfirmDelete] = useState<{ type: 'task' | 'list' | 'template'; id: number; label: string; extra?: string } | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState<{ type: 'task' | 'list'; id: number; label: string; extra?: string } | null>(null)
 
   // Quick capture
   const [quickTitle, setQuickTitle] = useState('')
@@ -122,28 +60,20 @@ export function TasksPage() {
   const [form, setForm] = useState<{
     title: string; description: string; status: TaskStatus
     dueDate: string; tags: string; listId: number | undefined; parentId: number | undefined
-    recurrenceRule: string; recurrenceEndDate: string
-  }>({ title: '', description: '', status: 'pending', dueDate: '', tags: '', listId: undefined, parentId: undefined, recurrenceRule: '', recurrenceEndDate: '' })
+    recurrenceRule: string; recurrenceEndDate: string; price: string
+  }>({ title: '', description: '', status: 'pending', dueDate: '', tags: '', listId: undefined, parentId: undefined, recurrenceRule: '', recurrenceEndDate: '', price: '' })
   const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [recurrenceEditScope, setRecurrenceEditScope] = useState<RecurrenceEditScope>('single')
 
   // List form
   const [listForm, setListForm] = useState({ name: '', color: LIST_COLORS[0], dueDate: '' })
 
-  // Template form
-  const [tplForm, setTplForm] = useState({ name: '', color: LIST_COLORS[0], items: '' })
-  const [editingTpl, setEditingTpl] = useState<ListTemplate | null>(null)
-
   /* ─── Data loading ──────────────────────────────────────────────────── */
 
   const load = useCallback(async () => {
-    const [{ tasks: freshTasks, lists: freshLists }, allTpls] = await Promise.all([
-      loadTaskCollections(),
-      db.listTemplates.toArray(),
-    ])
+    const { tasks: freshTasks, lists: freshLists } = await loadTaskCollections()
     setTasks(freshTasks)
     setLists(freshLists)
-    setTemplates(allTpls)
   }, [])
 
   useEffect(() => { load() }, [load])
@@ -263,7 +193,7 @@ export function TasksPage() {
     setForm({
       title: '', description: '', status: 'pending',
       dueDate: '', tags: '', listId: listId ?? (tab === 'lists' && selectedListId ? selectedListId : undefined),
-      parentId: undefined, recurrenceRule: '', recurrenceEndDate: '',
+      parentId: undefined, recurrenceRule: '', recurrenceEndDate: '', price: ''
     })
     setTaskModal(true)
   }
@@ -277,6 +207,7 @@ export function TasksPage() {
       listId: t.listId, parentId: t.parentId,
       recurrenceRule: t.recurrenceSourceId ? '' : (t.recurrenceRule || ''),
       recurrenceEndDate: t.recurrenceSourceId ? '' : (t.recurrenceEndDate || ''),
+      price: t.price ? t.price.toString() : ''
     })
     setTaskModal(true)
   }
@@ -354,6 +285,8 @@ export function TasksPage() {
     const recurrenceEndDate = canEditRecurrence
       ? (isRecurring ? (form.recurrenceEndDate || undefined) : undefined)
       : editingTask?.recurrenceEndDate
+    const parsedPrice = form.price ? parseFloat(form.price) : undefined
+
     const data: Omit<Task, 'id'> = {
       title: trimmedTitle,
       description,
@@ -366,6 +299,7 @@ export function TasksPage() {
       isRecurring,
       recurrenceRule,
       recurrenceEndDate,
+      price: parsedPrice,
       recurrenceSourceId: editingTask?.recurrenceSourceId,
       createdAt: editingTask?.createdAt ?? now(),
       completedAt: form.status === 'completed' ? (editingTask?.completedAt ?? now()) : undefined,
@@ -556,58 +490,6 @@ export function TasksPage() {
     await load()
   }
 
-  /* ─── Template CRUD ─────────────────────────────────────────────────── */
-
-  const openNewTemplate = () => {
-    setEditingTpl(null)
-    setTplForm({ name: '', color: LIST_COLORS[0], items: '' })
-    setTemplateModal(true)
-  }
-
-  const openEditTemplate = (tpl: ListTemplate) => {
-    setEditingTpl(tpl)
-    let items = ''
-    try { items = JSON.parse(tpl.items).join('\n') } catch { items = tpl.items }
-    setTplForm({ name: tpl.name, color: tpl.color, items })
-    setTemplateModal(true)
-  }
-
-  const saveTemplate = async () => {
-    if (!tplForm.name.trim()) return
-    const items = JSON.stringify(tplForm.items.split('\n').map(s => s.trim()).filter(Boolean))
-    if (editingTpl?.id) {
-      await db.listTemplates.update(editingTpl.id, { name: tplForm.name.trim(), color: tplForm.color, items })
-    } else {
-      await db.listTemplates.add({ name: tplForm.name.trim(), color: tplForm.color, items, createdAt: now() })
-    }
-    setTemplateModal(false)
-    await load()
-    showSaved()
-  }
-
-  const deleteTemplate = async (id: number) => {
-    await db.listTemplates.delete(id)
-    setConfirmDelete(null)
-    await load()
-  }
-
-  const createFromTemplate = async (tpl: ListTemplate) => {
-    const listId = await db.taskLists.add({ name: tpl.name, color: tpl.color, createdAt: now() })
-    let items: string[] = []
-    try { items = JSON.parse(tpl.items) } catch { /* empty */ }
-    for (let i = 0; i < items.length; i++) {
-      await db.tasks.add({
-        title: items[i], listId, status: 'pending',
-        sortOrder: i, createdAt: now(),
-      })
-    }
-    await load()
-    setTab('lists')
-    setSelectedListId(listId as number)
-    setCompletionVisibility('active')
-    showSaved()
-  }
-
   /* ─── Stats ─────────────────────────────────────────────────────────── */
 
   const stats = useMemo(() => {
@@ -654,127 +536,55 @@ export function TasksPage() {
     try { return JSON.parse(tags) } catch { return tags.split(',').map(t => t.trim()).filter(Boolean) }
   }
 
-  const listTaskCount = (listId: number) => {
+  const listTaskStats = (listId: number) => {
     const lt = tasks.filter(t => t.listId === listId && !t.parentId)
     const done = lt.filter(t => t.status === 'completed').length
-    return { total: lt.length, done }
+    const totalCost = lt.filter(t => t.status !== 'completed').reduce((sum, t) => sum + (t.price || 0), 0)
+    return { total: lt.length, done, totalCost }
   }
 
   /* ─── Render helpers ────────────────────────────────────────────────── */
 
-  const TaskRow = ({ t, depth = 0 }: { t: Task; depth?: number }) => {
-    const subs = subtasksOf(t.id!)
-    const tags = parseTags(t.tags)
-    const [showSubs, setShowSubs] = useState(true)
 
-    return (
-      <>
-        <motion.div
-          initial={{ opacity: 0, x: -8 }}
-          animate={{ opacity: 1, x: 0 }}
-          className={`group/row flex items-start gap-2 py-2.5 px-3 rounded-xl active:bg-surface-200/50 md:hover:bg-surface-200/40 transition-colors ${
-            t.status === 'completed' ? 'opacity-50' : ''
-          }`}
-          style={{ paddingLeft: `${12 + depth * 20}px` }}
-        >
-          <button
-            onClick={() => toggleStatus(t)}
-            className="mt-0.5 shrink-0 text-white/40 transition-colors hover:text-emerald-400 active:scale-90"
-            title={t.status === 'completed' ? 'Reabrir' : 'Completar'}
-          >
-            {t.status === 'completed'
-              ? <SquareCheckBig size={18} className="text-emerald-400" />
-              : <Square size={18} />}
-          </button>
-
-          <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setDetailTask(t)}>
-            <div className="flex items-center gap-2">
-              <span className={`text-sm font-medium truncate ${t.status === 'completed' ? 'line-through text-white/30' : ''}`}>
-                {t.title}
-              </span>
-              {t.isRecurring && <Repeat size={12} className="shrink-0 text-white/20" />}
-            </div>
-
-            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-              {t.dueDate && (
-                <span className={`text-[10px] flex items-center gap-0.5 ${
-                  t.dueDate < todayStr() && t.status !== 'completed' ? 'text-red-400' : 'text-white/30'
-                }`}>
-                  <CalendarDays size={10} /> {t.dueDate}
-                </span>
-              )}
-              {subs.length > 0 && (
-                <span className="text-[10px] text-white/30">
-                  {subs.filter(s => s.status === 'completed').length}/{subs.length} subtareas
-                </span>
-              )}
-              {tags.map(tag => (
-                <span key={tag} className="text-[9px] bg-accent/10 text-accent/70 px-1.5 py-0.5 rounded-md">{tag}</span>
-              ))}
-            </div>
-          </div>
-
-          <div className="flex items-center gap-1 md:opacity-0 md:group-hover/row:opacity-100 transition-opacity shrink-0">
-            <button onClick={() => openEditTask(t)} className="btn-ghost p-1.5 rounded-lg">
-              <Pencil size={13} className="text-white/40" />
-            </button>
-            <button onClick={() => requestDeleteTask(t)} className="btn-ghost p-1.5 rounded-lg">
-              <Trash2 size={13} className="text-white/40" />
-            </button>
-          </div>
-
-          {subs.length > 0 && (
-            <button onClick={() => setShowSubs(!showSubs)} className="mt-0.5 shrink-0 btn-ghost p-1 rounded">
-              {showSubs ? <ChevronDown size={14} className="text-white/30" /> : <ChevronRight size={14} className="text-white/30" />}
-            </button>
-          )}
-        </motion.div>
-
-        <AnimatePresence>
-          {showSubs && subs.map(s => <TaskRow key={s.id} t={s} depth={depth + 1} />)}
-        </AnimatePresence>
-      </>
-    )
-  }
 
   /* ─── Render ────────────────────────────────────────────────────────── */
 
   const renderTaskList = (items: Task[]) => (
-    <div className="divide-y divide-white/[0.03]">
-      {items.map(t => <TaskRow key={t.id} t={t} />)}
+    <div className="space-y-1">
+      {items.map(t => <TaskRow key={t.id} t={t} subtasksOf={subtasksOf} parseTags={parseTags} toggleStatus={toggleStatus} setDetailTask={setDetailTask} openEditTask={openEditTask} requestDeleteTask={requestDeleteTask} />)}
     </div>
   )
 
   return (
-    <div className="max-w-5xl mx-auto pb-6">
-      <div className="mb-5">
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <h1 className="text-xl md:text-2xl font-bold truncate">Tareas</h1>
-            <p className="text-xs text-white/30 mt-0.5">
-              {tab === 'lists' && !selectedListId
-                ? 'Listas, plantillas y seguimiento'
-                : isListDetail
-                  ? 'Vista enfocada por lista'
-                  : 'Captura, foco y seguimiento'}
-            </p>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <button onClick={openNewList} className="btn-secondary text-xs">
-              <FolderOpen size={14} /> <span className="hidden sm:inline">Nueva lista</span><span className="sm:hidden">Lista</span>
-            </button>
-            <button onClick={() => openNewTask()} className="btn-primary text-xs">
-              <Plus size={14} /> <span className="hidden sm:inline">Nueva tarea</span><span className="sm:hidden">Tarea</span>
-            </button>
-          </div>
+    <div className="max-w-5xl mx-auto pb-12 animate-in fade-in duration-500">
+      <div className="mb-6 flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight bg-gradient-to-br from-white to-white/50 bg-clip-text text-transparent">
+            {tab === 'lists' && !selectedListId ? 'Proyectos y Listas' : 'Tareas'}
+          </h1>
+          <p className="text-sm font-medium text-white/40 mt-1">
+            {tab === 'lists' && !selectedListId
+              ? 'Organiza por contexto y categorías'
+              : isListDetail
+                ? 'Gestiona la lista actual'
+                : 'Captura, foco y seguimiento'}
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0">
+          <button onClick={openNewList} className="btn-secondary h-10 px-3 sm:px-4 rounded-xl flex items-center gap-2 bg-surface-100/40 text-white/70 hover:bg-surface-100 text-sm font-semibold">
+            <FolderOpen size={15} /> <span className="hidden sm:inline">Lista</span>
+          </button>
+          <button onClick={() => openNewTask()} className="btn-primary h-10 px-3 sm:px-4 rounded-xl flex items-center gap-2 text-sm font-semibold shadow-lg shadow-accent/20">
+            <Plus size={15} /> <span className="hidden sm:inline">Tarea</span>
+          </button>
         </div>
       </div>
 
-      {/* ── Summary cards ─────────────────────────────────────────────── */}
-      <div className="mb-4 flex justify-center">
-        <div className="flex items-center gap-1 overflow-x-auto rounded-2xl bg-surface-100/55 p-1">
+      <div className="mb-6 flex justify-center">
+        <div className="flex p-1 bg-surface-100/60 rounded-xl shrink-0 backdrop-blur-md border border-white/[0.05]">
           {([
-            { key: 'tasks' as ViewTab, label: 'Tareas', icon: ListTodo },
+            { key: 'tasks' as ViewTab, label: 'Bandeja', icon: ListTodo },
             { key: 'lists' as ViewTab, label: 'Listas', icon: FolderOpen },
           ]).map(view => (
             <button
@@ -783,13 +593,13 @@ export function TasksPage() {
                 setTab(view.key)
                 setSelectedListId(null)
               }}
-              className={`flex items-center gap-1.5 shrink-0 rounded-xl px-4 py-2 text-sm font-medium transition-colors ${
+              className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-all ${
                 tab === view.key
-                  ? 'bg-accent/15 text-accent'
-                  : 'text-white/45 hover:bg-surface-200/45 hover:text-white/75'
+                  ? 'bg-accent text-white shadow-lg shadow-accent/20'
+                  : 'text-white/40 hover:bg-white/5 hover:text-white/80'
               }`}
             >
-              <view.icon size={13} />
+              <view.icon size={15} />
               {view.label}
             </button>
           ))}
@@ -797,254 +607,99 @@ export function TasksPage() {
       </div>
 
       {showTaskWorkspace && (
-        <div className="mb-4 flex justify-center">
-          <div className="flex bg-surface-200/40 rounded-lg p-0.5">
-            {([
-              { key: 'active' as CompletionVisibility, label: 'Activas' },
-              { key: 'completed' as CompletionVisibility, label: 'Completadas' },
-              { key: 'all' as CompletionVisibility, label: 'Todas' },
-            ]).map(view => (
+        <div className="mb-6 space-y-4">
+          <div className="flex flex-col items-center gap-2">
+            <div className="flex items-center gap-1.5 p-1 bg-surface-100/40 rounded-lg shrink-0 border border-white/[0.02]">
+              <div className="flex items-center gap-1">
+                {([
+                  { key: 'active' as CompletionVisibility, label: 'Activas' },
+                  { key: 'completed' as CompletionVisibility, label: 'Hechas' },
+                  { key: 'all' as CompletionVisibility, label: 'Todas' },
+                ]).map(view => (
+                  <button
+                    key={view.key}
+                    onClick={() => setCompletionVisibility(view.key)}
+                    className={`px-4 py-1.5 rounded-md text-[13px] font-semibold transition-all ${
+                      completionVisibility === view.key
+                        ? 'bg-white/10 text-white shadow-sm'
+                        : 'text-white/30 hover:text-white/60'
+                    }`}
+                  >
+                    {view.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="w-px h-5 bg-white/10 mx-0.5" />
+
               <button
-                key={view.key}
-                onClick={() => setCompletionVisibility(view.key)}
-                className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-all ${
-                  completionVisibility === view.key
-                    ? 'bg-accent/15 text-accent'
-                    : 'text-white/30 hover:text-white/50'
-                }`}
+                onClick={() => setShowFilters(true)}
+                className="w-8 h-8 rounded-md flex items-center justify-center text-white/50 hover:bg-white/10 hover:text-white/90 transition-all relative"
+                title="Filtrar y Ordenar"
               >
-                {view.label}
+                <SlidersHorizontal size={15} />
+                {(taskFocusFilter !== 'all' || (sortMode !== 'manual' && sortMode !== 'date')) && (
+                  <div className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-accent ring-2 ring-surface-100" />
+                )}
               </button>
-            ))}
-          </div>
-        </div>
-      )}
+            </div>
 
-      {showTaskWorkspace ? (
-        <Card className="mb-4 !p-3 sm:!p-4 space-y-3">
-          <div className="flex flex-wrap items-center gap-2">
-            {isListDetail && selectedListId && (
-              <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: listColor(selectedListId) }} />
-            )}
-            <h2 className="text-sm sm:text-base font-semibold">
-              {isListDetail && selectedListId ? listName(selectedListId) : 'Todas las tareas'}
-            </h2>
-            {selectedList?.completedAt && (
-              <span className="text-[10px] px-2 py-1 rounded-full bg-emerald-400/10 text-emerald-300">
-                Lista completada
-              </span>
-            )}
-            {selectedList?.dueDate && (
-              <span className={`text-[10px] px-2 py-1 rounded-full border ${
-                selectedList.dueDate < todayStr()
-                  ? 'border-red-400/20 bg-red-400/10 text-red-300'
-                  : 'border-white/[0.08] bg-surface-100/60 text-white/45'
-              }`}>
-                {selectedList.dueDate}
-              </span>
+            {(taskFocusFilter !== 'all' || (sortMode !== 'manual' && sortMode !== 'date')) && (
+              <div className="flex flex-wrap items-center justify-center gap-2 mt-1 animate-in slide-in-from-top-1 fade-in duration-300">
+                {taskFocusFilter !== 'all' && (
+                  <span className="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-md bg-accent/20 text-accent ring-1 ring-accent/30">
+                    Foco: {focusFilterLabel}
+                  </span>
+                )}
+                {sortMode !== 'manual' && sortMode !== 'date' && (
+                  <span className="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-md bg-white/10 text-white/70 ring-1 ring-white/20">
+                    Ord: {SORT_OPTIONS.find(o => o.value === sortMode)?.label}
+                  </span>
+                )}
+              </div>
             )}
           </div>
 
-          <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 sm:flex sm:items-center">
-            <SheetSelect
-              value={sortMode}
-              onChange={value => setSortMode(value as SortMode)}
-              options={SORT_OPTIONS}
-              placeholder="Ordenar"
-              title="Ordenar tareas"
-              className="min-w-0 sm:w-36 sm:shrink-0"
-              buttonClassName="h-11 min-h-[44px] text-xs"
-            />
-
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className={`input-field h-11 min-h-[44px] px-3 text-xs inline-flex items-center justify-center gap-2 whitespace-nowrap transition-colors ${
-                showFilters || taskFocusFilter !== 'all'
-                  ? 'border-accent/30 bg-accent/10 text-accent'
-                  : 'text-white/65'
-              }`}
-            >
-              <SlidersHorizontal size={14} />
-              <span>Filtrar</span>
-              {taskFocusFilter !== 'all' && (
-                <span className="hidden sm:inline text-[10px] px-1.5 py-0.5 rounded-md bg-accent/20">
-                  {focusFilterLabel}
+          <div className="flex items-center justify-between gap-4 pt-2">
+            <div className="flex items-center gap-3">
+              {isListDetail && selectedListId && (
+                <div className="w-4 h-4 rounded-full shadow-inner" style={{ backgroundColor: listColor(selectedListId) }} />
+              )}
+              <h2 className="text-xl font-bold tracking-tight">
+                {isListDetail && selectedListId ? listName(selectedListId) : 'Todas las tareas'}
+              </h2>
+              {selectedList?.completedAt && (
+                <span className="text-[10px] uppercase font-bold tracking-wider px-2.5 py-1 rounded-md bg-emerald-400/10 text-emerald-400">
+                  Completada
                 </span>
               )}
-            </button>
+              {selectedList?.dueDate && (
+                <span className={`text-[10px] font-bold px-2.5 py-1 rounded-md ${
+                  selectedList.dueDate < todayStr()
+                    ? 'bg-red-400/10 text-red-500'
+                    : 'bg-surface-200/60 text-white/50'
+                }`}>
+                  {selectedList.dueDate}
+                </span>
+              )}
+            </div>
           </div>
-
-          <AnimatePresence>
-            {showFilters && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                className="overflow-hidden"
-              >
-                <div className="flex flex-wrap gap-2 pt-1">
-                  {TASK_FOCUS_FILTER_OPTIONS
-                    .filter(option => !(isListDetail && option.value === 'unassigned'))
-                    .map(option => {
-                      const active = taskFocusFilter === option.value
-                      return (
-                        <button
-                          key={option.value}
-                          onClick={() => {
-                            setTaskFocusFilter(option.value as TaskFocusFilter)
-                            setShowFilters(false)
-                          }}
-                          className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-colors ${
-                            active
-                              ? 'bg-accent/15 text-accent border border-accent/20'
-                              : 'bg-surface-100/60 text-white/45 hover:text-white/70'
-                          }`}
-                        >
-                          {option.label}
-                        </button>
-                      )
-                    })}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-        </Card>
-      ) : (
-        <Card className="mb-4 !p-3 sm:!p-4">
-          <h2 className="text-sm sm:text-base font-semibold">Listas</h2>
-          <p className="text-sm text-white/35 mt-1">
-            Organiza tus tareas por proyecto, contexto o rutina sin mezclarlo con los filtros de estado.
-          </p>
-        </Card>
+        </div>
       )}
 
       {/* ── Lists tab: overview ───────────────────────────────────────────── */}
       {tab === 'lists' && !selectedListId && (
-        <div className="space-y-4">
-          {/* Templates bar */}
-          {templates.length > 0 && (
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-[10px] text-white/30 uppercase tracking-wide">Plantillas</p>
-                <button onClick={openNewTemplate} className="btn-ghost text-[10px] text-white/30 px-2 py-1 rounded-lg flex items-center gap-1">
-                  <Plus size={12} /> Nueva
-                </button>
-              </div>
-              <div className="flex gap-2 overflow-x-auto pb-1">
-                {templates.map(tpl => (
-                  <div key={tpl.id} className="shrink-0 bg-surface-100/60 rounded-xl p-3 border border-white/[0.05] min-w-[140px]">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: tpl.color }} />
-                      <span className="text-xs font-medium truncate flex-1">{tpl.name}</span>
-                    </div>
-                    <div className="flex gap-1">
-                      <button onClick={() => createFromTemplate(tpl)} className="btn-primary text-[9px] px-2 py-1 rounded-lg flex items-center gap-1 flex-1">
-                        <Copy size={10} /> Usar
-                      </button>
-                      <button onClick={() => openEditTemplate(tpl)} className="btn-ghost p-1 rounded-lg">
-                        <Pencil size={11} className="text-white/30" />
-                      </button>
-                      <button onClick={() => setConfirmDelete({ type: 'template', id: tpl.id!, label: tpl.name })} className="btn-ghost p-1 rounded-lg">
-                        <Trash2 size={11} className="text-white/30" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {activeLists.length === 0 && completedLists.length === 0 && templates.length === 0 ? (
-              <div className="col-span-full">
-                <EmptyState
-                  icon={<FolderOpen size={40} />}
-                  title="Sin listas aun"
-                  desc="Crea listas para organizar tus tareas por contexto"
-                  action={
-                    <div className="flex gap-2 justify-center mt-2">
-                      <button onClick={openNewList} className="btn-primary text-xs px-4 py-2 rounded-xl inline-flex items-center gap-1.5">
-                        <Plus size={14} /> Crear lista
-                      </button>
-                      <button onClick={openNewTemplate} className="btn-secondary text-xs px-4 py-2 rounded-xl inline-flex items-center gap-1.5">
-                        <Copy size={14} /> Plantilla
-                      </button>
-                    </div>
-                  }
-                />
-              </div>
-            ) : (
-              <>
-                {activeLists.map(l => {
-                  const { total, done } = listTaskCount(l.id!)
-                  const pct = total > 0 ? Math.round((done / total) * 100) : 0
-                  return (
-                    <Card key={l.id} hover className="!p-4 cursor-pointer" onClick={() => { setSelectedListId(l.id!); setCompletionVisibility('active') }}>
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-3.5 h-3.5 rounded-full shrink-0" style={{ backgroundColor: l.color }} />
-                          <span className="text-sm font-semibold truncate">{l.name}</span>
-                        </div>
-                        <div className="flex gap-1">
-                          <button onClick={e => { e.stopPropagation(); openEditList(l) }} className="btn-ghost p-1 rounded-lg">
-                            <Pencil size={12} className="text-white/30" />
-                          </button>
-                          <button onClick={e => { e.stopPropagation(); completeList(l) }} className="btn-ghost p-1 rounded-lg" title="Completar lista">
-                            <CheckCheck size={12} className="text-emerald-400" />
-                          </button>
-                          <button onClick={e => { e.stopPropagation(); requestDeleteList(l) }} className="btn-ghost p-1 rounded-lg" title="Eliminar">
-                            <Trash2 size={12} className="text-white/30" />
-                          </button>
-                        </div>
-                      </div>
-                      {l.dueDate && (
-                        <div className={`text-[10px] mb-2 flex items-center gap-1 ${l.dueDate < todayStr() ? 'text-red-400' : 'text-white/30'}`}>
-                          <CalendarDays size={10} /> {l.dueDate}
-                        </div>
-                      )}
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1 h-1.5 bg-surface-200/60 rounded-full overflow-hidden">
-                          <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: l.color }} />
-                        </div>
-                        <span className="text-[10px] text-white/30 shrink-0">{done}/{total}</span>
-                      </div>
-                    </Card>
-                  )
-                })}
-                <Card className="!p-4 cursor-pointer !border-dashed flex items-center justify-center min-h-[80px]" hover onClick={openNewList}>
-                  <div className="flex items-center gap-2 text-white/30">
-                    <Plus size={18} /> <span className="text-xs font-medium">Nueva lista</span>
-                  </div>
-                </Card>
-              </>
-            )}
-          </div>
-
-          {completedLists.length > 0 && (
-            <div>
-              <p className="text-[10px] text-white/30 uppercase tracking-wide mb-2">Listas completadas</p>
-              <div className="space-y-1">
-                {completedLists.map(l => {
-                  const { total, done } = listTaskCount(l.id!)
-                  return (
-                    <div key={l.id} className="flex items-center gap-2 px-3 py-2 bg-surface-100/40 rounded-xl cursor-pointer" onClick={() => { setSelectedListId(l.id!); setCompletionVisibility('all') }}>
-                      <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: l.color }} />
-                      <div className="flex-1 min-w-0">
-                        <div className="text-xs text-white/70 truncate">{l.name}</div>
-                        <div className="text-[10px] text-white/30">{done}/{total} completadas</div>
-                      </div>
-                      <span className="text-[10px] text-emerald-400">Lista terminada</span>
-                      <button onClick={e => { e.stopPropagation(); requestDeleteList(l) }} className="btn-ghost p-1 rounded-lg" title="Eliminar">
-                        <Trash2 size={13} className="text-white/30" />
-                      </button>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )}
-        </div>
+        <ListsView
+          activeLists={activeLists}
+          completedLists={completedLists}
+          listTaskStats={listTaskStats}
+          openNewList={openNewList}
+          openEditList={openEditList}
+          completeList={completeList}
+          requestDeleteList={requestDeleteList}
+          setSelectedListId={setSelectedListId}
+          setCompletionVisibility={setCompletionVisibility}
+        />
       )}
 
       {/* ── Main content: task list ──────────────────────────────────────── */}
@@ -1301,6 +956,12 @@ export function TasksPage() {
             <input className="input-field w-full" placeholder="trabajo, personal" value={form.tags} onChange={e => setForm({ ...form, tags: e.target.value })} />
           </div>
 
+          {/* Precio */}
+          <div>
+            <label className="text-[11px] font-medium uppercase tracking-[0.06em] text-white/35 mb-1.5 block">Costo / Precio (Opcional)</label>
+            <input type="number" step="0.01" className="input-field w-full" placeholder="e.g. 50.00" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} />
+          </div>
+
           {editingTask?.isRecurring && !editingTask.recurrenceSourceId && (
             <p className="text-[11px] text-white/30">
               Estas editando la tarea base. Los cambios de recurrencia afectan a toda la serie.
@@ -1348,35 +1009,6 @@ export function TasksPage() {
         </div>
       </Modal>
 
-      {/* ── Template Form Modal ───────────────────────────────────────────── */}
-      <Modal open={templateModal} onClose={() => setTemplateModal(false)} title={editingTpl ? 'Editar plantilla' : 'Nueva plantilla'} size="sm">
-        <div className="space-y-4">
-          <div>
-            <label className="text-[11px] font-medium uppercase tracking-[0.06em] text-white/35 mb-1.5 block">Nombre *</label>
-            <input className="input-field w-full" value={tplForm.name} onChange={e => setTplForm({ ...tplForm, name: e.target.value })} autoFocus />
-          </div>
-          <div>
-            <label className="text-[11px] font-medium uppercase tracking-[0.06em] text-white/35 mb-1.5 block">Color</label>
-            <div className="flex gap-2.5 mt-1 flex-wrap">
-              {LIST_COLORS.map(c => (
-                <button key={c} onClick={() => setTplForm({ ...tplForm, color: c })}
-                  className={`w-8 h-8 rounded-full transition-all ${tplForm.color === c ? 'ring-2 ring-white/50 ring-offset-2 ring-offset-surface-100 scale-110' : 'hover:scale-105 opacity-70 hover:opacity-100'}`}
-                  style={{ backgroundColor: c }} />
-              ))}
-            </div>
-          </div>
-          <div className="h-px bg-white/[0.05]" />
-          <div>
-            <label className="text-[11px] font-medium uppercase tracking-[0.06em] text-white/35 mb-1.5 block">Items (uno por línea)</label>
-            <textarea className="input-field w-full min-h-[120px] resize-y text-sm" placeholder={"Leche\nHuevos\nPan\nFrutas"} value={tplForm.items} onChange={e => setTplForm({ ...tplForm, items: e.target.value })} />
-          </div>
-          <div className="flex justify-end gap-2 pt-1">
-            <button onClick={() => setTemplateModal(false)} className="btn-ghost px-4 py-2.5 rounded-xl text-sm">Cancelar</button>
-            <button onClick={saveTemplate} className="btn-primary px-5 py-2.5 rounded-xl text-sm">{editingTpl ? 'Guardar cambios' : 'Crear plantilla'}</button>
-          </div>
-        </div>
-      </Modal>
-
       {/* ── Confirm Delete Modal ──────────────────────────────────────────── */}
       <Modal open={!!confirmDelete} onClose={() => setConfirmDelete(null)} title="Confirmar eliminacion" size="sm">
         {confirmDelete && (
@@ -1387,7 +1019,7 @@ export function TasksPage() {
               </div>
               <div>
                 <p className="text-sm font-medium">
-                  Eliminar {confirmDelete.type === 'list' ? 'lista' : confirmDelete.type === 'template' ? 'plantilla' : 'tarea'} "<span className="text-accent">{confirmDelete.label}</span>"?
+                  Eliminar {confirmDelete.type === 'list' ? 'lista' : 'tarea'} "<span className="text-accent">{confirmDelete.label}</span>"?
                 </p>
                 {confirmDelete.extra && <p className="text-xs text-white/40 mt-1">{confirmDelete.extra}</p>}
               </div>
@@ -1397,7 +1029,6 @@ export function TasksPage() {
               <button
                 onClick={() => {
                   if (confirmDelete.type === 'list') executeDeleteList(confirmDelete.id)
-                  else if (confirmDelete.type === 'template') deleteTemplate(confirmDelete.id)
                   else executeDeleteTask(confirmDelete.id)
                 }}
                 className="bg-red-500/20 text-red-400 hover:bg-red-500/30 px-4 py-2 rounded-xl text-sm font-medium transition-colors"
@@ -1424,129 +1055,56 @@ export function TasksPage() {
           parseTags={parseTags}
         />}
       </Modal>
-    </div>
-  )
-}
 
-/* ─── Mini stat card for summary ──────────────────────────────────────── */
-
-/* ─── Task Detail (extracted for clean state) ─────────────────────────── */
-
-function TaskDetail({ task, onCycleStatus, onToggleStatus, onAddSubtask, onDeleteTask, onEdit, subtasksOf, listName, listColor, parseTags }: {
-  task: Task
-  onCycleStatus: (t: Task) => Promise<void>
-  onToggleStatus: (t: Task) => Promise<void>
-  onAddSubtask: (parentId: number, title: string) => Promise<void>
-  onDeleteTask: (t: Task) => void
-  onEdit: (t: Task) => void
-  subtasksOf: (parentId: number) => Task[]
-  listName: (id?: number) => string
-  listColor: (id?: number) => string
-  parseTags: (tags?: string) => string[]
-}) {
-  const st = STATUS_CFG[task.status]
-  const subs = subtasksOf(task.id!)
-  const tags = parseTags(task.tags)
-
-  return (
-    <div className="space-y-5">
-      <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-        <button onClick={() => onCycleStatus(task)} className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium ${st.color} bg-surface-200/40`}>
-          {task.status === 'completed' ? <SquareCheckBig size={14} /> : <Square size={14} />}
-          {task.status === 'completed' ? 'Completada' : 'Marcar completada'}
-        </button>
-        {task.dueDate && task.status !== 'completed' && (
-          <span className="flex items-center gap-1 text-xs text-accent/80">
-            <CalendarDays size={13} /> Programada
-          </span>
-        )}
-        {task.dueDate && (
-          <span className={`flex items-center gap-1 text-xs ${
-            task.dueDate < todayStr() && task.status !== 'completed' ? 'text-red-400' : 'text-white/40'
-          }`}>
-            <CalendarDays size={13} /> {task.dueDate}
-          </span>
-        )}
-        {task.isRecurring && (
-          <span className="flex items-center gap-1 text-xs text-white/30">
-            <Repeat size={12} /> {task.recurrenceRule === 'daily' ? 'Diaria' : task.recurrenceRule === 'weekly' ? 'Semanal' : 'Mensual'}
-          </span>
-        )}
-        {task.listId && (
-          <span className="flex items-center gap-1 text-xs text-white/40">
-            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: listColor(task.listId) }} />
-            {listName(task.listId)}
-          </span>
-        )}
-      </div>
-
-      {tags.length > 0 && (
-        <div className="flex gap-1.5 flex-wrap">
-          {tags.map(tag => (
-            <span key={tag} className="text-[10px] bg-accent/10 text-accent/70 px-2 py-0.5 rounded-md flex items-center gap-1">
-              <Tag size={10} /> {tag}
-            </span>
-          ))}
-        </div>
-      )}
-
-      {task.description && (
-        <div>
-          <p className="text-[10px] text-white/30 uppercase tracking-wide mb-1">Descripcion</p>
-          <p className="text-sm text-white/60 whitespace-pre-wrap">{task.description}</p>
-        </div>
-      )}
-
-      {/* Subtasks */}
-      <div>
-        <p className="text-[10px] text-white/30 uppercase tracking-wide mb-2">
-          Subtareas ({subs.filter(s => s.status === 'completed').length}/{subs.length})
-        </p>
-        <div className="space-y-1">
-          {subs.map(s => (
-            <div key={s.id} className="group/sub flex items-center gap-2 py-1.5 rounded-lg">
-              <button onClick={() => onToggleStatus(s)} className={`shrink-0 ${STATUS_CFG[s.status].color}`}>
-                {s.status === 'completed' ? <SquareCheckBig size={16} /> : <Square size={16} />}
-              </button>
-              <span className={`text-sm flex-1 ${s.status === 'completed' ? 'line-through text-white/30' : ''}`}>{s.title}</span>
-              <button onClick={() => onDeleteTask(s)} className="btn-ghost p-1 rounded md:opacity-0 md:group-hover/sub:opacity-100 transition-opacity">
-                <X size={12} className="text-white/30" />
-              </button>
+      {/* ── Filter / Sort Modal ───────────────────────────────────────────── */}
+      <Modal open={showFilters} onClose={() => setShowFilters(false)} title="Ordenar y Filtrar" size="sm">
+        <div className="space-y-6 pb-2">
+          <div>
+            <h3 className="text-[11px] font-bold uppercase tracking-widest text-white/30 mb-3 ml-1">Modalidad de Orden</h3>
+            <div className="grid grid-cols-2 gap-2">
+              {SORT_OPTIONS.map(opt => (
+                <button
+                  key={opt.value}
+                  onClick={() => setSortMode(opt.value as SortMode)}
+                  className={`px-3 py-2.5 rounded-xl text-sm font-semibold transition-all text-center ${
+                    sortMode === opt.value
+                      ? 'bg-accent text-white shadow-md shadow-accent/20'
+                      : 'bg-surface-100/50 text-white/50 hover:bg-surface-200 hover:text-white/70'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
             </div>
-          ))}
+          </div>
+          <div className="h-px bg-white/[0.05]" />
+          <div>
+            <h3 className="text-[11px] font-bold uppercase tracking-widest text-white/30 mb-3 ml-1">Foco por Atributos</h3>
+            <div className="flex flex-wrap gap-2">
+              {TASK_FOCUS_FILTER_OPTIONS
+                .filter(option => !(isListDetail && option.value === 'unassigned'))
+                .map(opt => {
+                  const active = taskFocusFilter === opt.value
+                  return (
+                    <button
+                      key={opt.value}
+                      onClick={() => setTaskFocusFilter(opt.value as TaskFocusFilter)}
+                      className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                        active
+                          ? 'bg-accent/20 text-accent ring-1 ring-accent/30'
+                          : 'bg-surface-100/50 text-white/50 hover:bg-surface-200/50'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  )
+                })}
+            </div>
+          </div>
         </div>
-        <SubtaskInput parentId={task.id!} onAdd={onAddSubtask} />
-      </div>
-
-      <div className="flex items-center gap-4 text-[10px] text-white/20 pt-2 border-t border-white/[0.05] flex-wrap">
-        <span>Creada: {new Date(task.createdAt).toLocaleDateString()}</span>
-        {task.completedAt && <span>Completada: {new Date(task.completedAt).toLocaleDateString()}</span>}
-      </div>
-
-      <div className="flex flex-col-reverse sm:flex-row justify-end gap-2">
-        <button onClick={() => onDeleteTask(task)} className="btn-ghost px-3 py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 text-red-400 hover:bg-red-400/10">
-          <Trash2 size={13} /> Eliminar
-        </button>
-        <button onClick={() => onEdit(task)} className="btn-secondary px-3 py-2 rounded-xl text-xs flex items-center justify-center gap-1.5">
-          <Pencil size={13} /> Editar
-        </button>
-      </div>
+      </Modal>
     </div>
   )
 }
 
-/* ─── Local-state input components ────────────────────────────────────── */
 
-function SubtaskInput({ parentId, onAdd }: { parentId: number; onAdd: (parentId: number, title: string) => Promise<void> }) {
-  const [text, setText] = useState('')
-  return (
-    <div className="flex items-center gap-2 mt-2">
-      <input className="input-field flex-1 text-sm py-1.5" placeholder="Agregar subtarea..." value={text}
-        onChange={e => setText(e.target.value)}
-        onKeyDown={async e => { if (e.key === 'Enter') { await onAdd(parentId, text); setText('') } }} />
-      <button onClick={async () => { await onAdd(parentId, text); setText('') }} className="btn-ghost p-1.5 rounded-lg">
-        <Plus size={14} className="text-white/40" />
-      </button>
-    </div>
-  )
-}

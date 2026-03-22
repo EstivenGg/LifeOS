@@ -103,137 +103,152 @@ export function SleepSection({ entry, isAdv, isHorizontal, onToggleAdv, onUpdate
             </div>
           )
         ) : isHorizontal ? (
-          /* ── Advanced horizontal: moon | hours | sun timeline ── */
-          <div className="flex-1 flex flex-col justify-center gap-5 min-h-0">
-            {/* Three-column timeline */}
-            <div className="flex items-center gap-3">
-              {/* Bedtime */}
-              <div className="flex-1 flex flex-col items-center gap-2">
-                <div className="w-10 h-10 rounded-2xl bg-indigo-400/15 border border-indigo-400/20 flex items-center justify-center shadow-[0_0_12px_rgba(129,140,248,0.15)]">
-                  <Moon size={18} className="text-indigo-400" />
-                </div>
-                <span className="text-[9px] font-black text-white/30 uppercase tracking-widest">Dormí</span>
-                <div className="w-full text-center">
-                  <span className="text-2xl font-black text-white/80 tabular-nums">
-                    {entry.sleepBedtime || '—'}
-                  </span>
-                </div>
-              </div>
-
-              {/* Divider line left */}
-              <div className="flex-1 h-px bg-gradient-to-r from-indigo-400/20 to-indigo-400/5" />
-
-              {/* Hours circle */}
-              <div className="relative flex flex-col items-center shrink-0">
-                <div className="relative w-24 h-24 flex items-center justify-center">
-                  <div className="absolute inset-0 rounded-full border-2 border-indigo-400/15" />
-                  <motion.div
-                    className="absolute inset-0 rounded-full"
-                    style={{ background: 'radial-gradient(circle, rgba(129,140,248,0.12) 0%, transparent 70%)' }}
-                    animate={{ scale: [1, 1.06, 1] }}
-                    transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }}
+          /* ── Advanced horizontal: premium stacked layout ── */
+          <div className="flex-1 flex flex-col justify-center gap-8 min-h-0 overflow-y-auto pb-4 custom-scrollbar mt-1">
+            
+            {/* Top: Hours circle */}
+            <div className="flex flex-col items-center justify-center shrink-0">
+              <div className="relative w-32 h-32 sm:w-40 sm:h-40 flex items-center justify-center">
+                <div className="absolute inset-0 rounded-full border border-indigo-400/20 shadow-[inset_0_0_20px_rgba(129,140,248,0.1)]" />
+                <motion.div
+                  className="absolute inset-0 rounded-full"
+                  style={{ background: 'radial-gradient(circle, rgba(129,140,248,0.12) 0%, transparent 68%)' }}
+                  animate={{ scale: [1, 1.05, 1] }}
+                  transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+                />
+                <div className="relative z-10 flex flex-col items-center mt-2">
+                  <input
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    max="24"
+                    inputMode="decimal"
+                    value={entry.sleepHours ?? ''}
+                    onChange={e => onUpdate({ sleepHours: e.target.value ? parseFloat(e.target.value) : undefined })}
+                    placeholder="—"
+                    className="w-24 bg-transparent border-none outline-none text-center text-5xl sm:text-6xl leading-none font-black text-white tabular-nums placeholder:text-white/20 focus:ring-0 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                   />
-                  <div className="relative z-10 flex flex-col items-center">
-                    <input
-                      type="number"
-                      step="0.5"
-                      min="0"
-                      max="24"
-                      inputMode="decimal"
-                      value={entry.sleepHours ?? ''}
-                      onChange={e => onUpdate({ sleepHours: e.target.value ? parseFloat(e.target.value) : undefined })}
-                      placeholder="—"
-                      className="w-16 bg-transparent border-none outline-none text-center text-3xl font-black text-white tabular-nums placeholder:text-white/20 focus:ring-0 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                    />
-                    <span className="text-[8px] font-black text-indigo-400/50 uppercase tracking-widest">horas</span>
-                  </div>
-                </div>
-                {entry.sleepBedtime && entry.sleepWakeTime && (
-                  <span className="text-[8px] text-indigo-400/40 font-bold mt-1">auto</span>
-                )}
-              </div>
-
-              {/* Divider line right */}
-              <div className="flex-1 h-px bg-gradient-to-l from-amber-400/20 to-amber-400/5" />
-
-              {/* Wake time */}
-              <div className="flex-1 flex flex-col items-center gap-2">
-                <div className="w-10 h-10 rounded-2xl bg-amber-400/15 border border-amber-400/20 flex items-center justify-center shadow-[0_0_12px_rgba(251,191,36,0.15)]">
-                  <Sun size={18} className="text-amber-400" />
-                </div>
-                <span className="text-[9px] font-black text-white/30 uppercase tracking-widest">Desperté</span>
-                <div className="w-full text-center">
-                  <span className="text-2xl font-black text-white/80 tabular-nums">
-                    {entry.sleepWakeTime || '—'}
-                  </span>
+                  <span className="text-[10px] font-black text-indigo-400/50 uppercase tracking-widest mt-1.5">horas</span>
                 </div>
               </div>
+              {entry.sleepBedtime && entry.sleepWakeTime && (
+                <span className="text-[9px] text-indigo-400/50 font-bold uppercase tracking-widest bg-surface-200/60 px-2.5 py-1 rounded-full border border-white/[0.08] mt-4 shadow-sm">auto-calculado</span>
+              )}
             </div>
 
-            {/* Time pickers row */}
-            <div className="grid grid-cols-2 gap-3">
-              <PremiumTimePicker
-                value={entry.sleepBedtime}
-                onChange={value => onUpdateSleepTime('sleepBedtime', value)}
-                title="Me dormí"
-                placeholder="Hora de dormir"
-                minuteStep={5}
-              />
-              <PremiumTimePicker
-                value={entry.sleepWakeTime}
-                onChange={value => onUpdateSleepTime('sleepWakeTime', value)}
-                title="Me desperté"
-                placeholder="Hora de despertar"
-                minuteStep={5}
-              />
+            {/* Bottom: Bedtime & Wake time */}
+            <div className="grid grid-cols-2 gap-4 shrink-0 px-2">
+              {/* Bedtime */}
+              <div className="flex flex-col items-center gap-2.5 relative group cursor-pointer hover:bg-white/[0.04] p-4 sm:p-5 rounded-[24px] transition-colors border border-white/5 bg-surface-200/30 shadow-sm">
+                <div className="w-12 h-12 rounded-2xl bg-indigo-400/15 border border-indigo-400/20 flex items-center justify-center shadow-[0_0_15px_rgba(129,140,248,0.15)] group-active:scale-95 transition-transform">
+                  <Moon size={22} className="text-indigo-400" />
+                </div>
+                <span className="text-[10px] font-black text-white/40 uppercase tracking-widest mt-1">Dormí</span>
+                <div className="w-full text-center flex flex-col items-center">
+                  <span className="text-2xl sm:text-3xl font-black text-indigo-50 tabular-nums tracking-tight">
+                    {entry.sleepBedtime || '—'}
+                  </span>
+                  {!entry.sleepBedtime && <span className="text-[10px] text-white/20 mt-1 uppercase tracking-widest font-bold">Tocar</span>}
+                </div>
+                {/* Invisible picker overlay */}
+                <div className="absolute inset-0 z-10 opacity-0">
+                  <PremiumTimePicker
+                    value={entry.sleepBedtime}
+                    onChange={value => onUpdateSleepTime('sleepBedtime', value)}
+                    title="Me dormí"
+                    minuteStep={5}
+                    buttonClassName="w-full h-full absolute inset-0 !min-h-0"
+                  />
+                </div>
+              </div>
+
+              {/* Wake time */}
+              <div className="flex flex-col items-center gap-2.5 relative group cursor-pointer hover:bg-white/[0.04] p-4 sm:p-5 rounded-[24px] transition-colors border border-white/5 bg-surface-200/30 shadow-sm">
+                <div className="w-12 h-12 rounded-2xl bg-amber-400/15 border border-amber-400/20 flex items-center justify-center shadow-[0_0_15px_rgba(251,191,36,0.15)] group-active:scale-95 transition-transform">
+                  <Sun size={22} className="text-amber-400" />
+                </div>
+                <span className="text-[10px] font-black text-white/40 uppercase tracking-widest mt-1">Desperté</span>
+                <div className="w-full text-center flex flex-col items-center">
+                  <span className="text-2xl sm:text-3xl font-black text-amber-50 tabular-nums tracking-tight">
+                    {entry.sleepWakeTime || '—'}
+                  </span>
+                  {!entry.sleepWakeTime && <span className="text-[10px] text-white/20 mt-1 uppercase tracking-widest font-bold">Tocar</span>}
+                </div>
+                {/* Invisible picker overlay */}
+                <div className="absolute inset-0 z-10 opacity-0">
+                  <PremiumTimePicker
+                    value={entry.sleepWakeTime}
+                    onChange={value => onUpdateSleepTime('sleepWakeTime', value)}
+                    title="Me desperté"
+                    minuteStep={5}
+                    buttonClassName="w-full h-full absolute inset-0 !min-h-0"
+                  />
+                </div>
+              </div>
             </div>
           </div>
         ) : (
-          /* ── Advanced vertical: compact ── */
-          <div className="space-y-4">
+          /* ── Advanced vertical: premium cards ── */
+          <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
-              <div>
-                <div className="flex items-center gap-1.5 mb-1">
-                  <Moon size={12} className="text-indigo-400" />
-                  <label className="text-[10px] text-white/30">Me dormí</label>
+              {/* Bedtime */}
+              <div className="flex flex-col gap-2 p-3.5 rounded-2xl bg-surface-200/30 border border-white/5 hover:border-white/10 transition-colors">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-indigo-400/15 flex items-center justify-center shadow-inner">
+                    <Moon size={15} className="text-indigo-400" />
+                  </div>
+                  <span className="text-[10px] font-bold text-white/50 uppercase tracking-widest">Dormí</span>
                 </div>
                 <PremiumTimePicker
                   value={entry.sleepBedtime}
                   onChange={value => onUpdateSleepTime('sleepBedtime', value)}
                   title="Me dormí"
-                  placeholder="Hora"
+                  placeholder="00:00"
                   minuteStep={5}
                 />
               </div>
-              <div>
-                <div className="flex items-center gap-1.5 mb-1">
-                  <Sun size={12} className="text-amber-400" />
-                  <label className="text-[10px] text-white/30">Me desperté</label>
+
+              {/* Wake time */}
+              <div className="flex flex-col gap-2 p-3.5 rounded-2xl bg-surface-200/30 border border-white/5 hover:border-white/10 transition-colors">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-amber-400/15 flex items-center justify-center shadow-inner">
+                    <Sun size={15} className="text-amber-400" />
+                  </div>
+                  <span className="text-[10px] font-bold text-white/50 uppercase tracking-widest">Desperté</span>
                 </div>
                 <PremiumTimePicker
                   value={entry.sleepWakeTime}
                   onChange={value => onUpdateSleepTime('sleepWakeTime', value)}
                   title="Me desperté"
-                  placeholder="Hora"
+                  placeholder="00:00"
                   minuteStep={5}
                 />
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <input
-                type="number"
-                step="0.5"
-                min="0"
-                max="24"
-                value={entry.sleepHours ?? ''}
-                onChange={e => onUpdate({ sleepHours: e.target.value ? parseFloat(e.target.value) : undefined })}
-                placeholder="7.5"
-                className="input-field w-24"
-              />
-              <span className="text-xs text-white/30">horas</span>
-              {entry.sleepBedtime && entry.sleepWakeTime && (
-                <span className="text-[10px] text-accent/60">← auto-calculado</span>
-              )}
+
+            {/* Total hours */}
+            <div className="flex items-center justify-between p-4 rounded-2xl bg-surface-200/40 border border-white/[0.04]">
+              <div className="flex flex-col gap-0.5">
+                <span className="text-[13px] font-bold text-white/80">Total de horas</span>
+                {entry.sleepBedtime && entry.sleepWakeTime ? (
+                  <span className="text-[9px] font-bold text-accent/70 uppercase tracking-widest">Cálculo automático</span>
+                ) : (
+                  <span className="text-[9px] font-bold text-white/30 uppercase tracking-widest">Opcional</span>
+                )}
+              </div>
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="number"
+                  step="0.5"
+                  min="0"
+                  max="24"
+                  inputMode="decimal"
+                  value={entry.sleepHours ?? ''}
+                  onChange={e => onUpdate({ sleepHours: e.target.value ? parseFloat(e.target.value) : undefined })}
+                  placeholder="—"
+                  className="w-[72px] bg-surface-100/60 border border-white/[0.08] rounded-xl outline-none text-center text-xl font-black text-white tabular-nums placeholder:text-white/20 focus:ring-2 focus:ring-accent/50 focus:border-accent py-1.5 transition-all"
+                />
+              </div>
             </div>
           </div>
         )}

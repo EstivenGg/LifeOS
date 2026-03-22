@@ -128,7 +128,8 @@ export interface EntryReading {
 export interface WorkoutSetEntry {
   reps: number
   weight?: number
-  rpe?: number
+  rpe?: number       // legacy, kept for old data
+  nextWeight?: number // peso sugerido para la próxima vez
 }
 
 export interface EntryWorkoutExercise {
@@ -225,6 +226,7 @@ export interface Task {
   archived?: boolean
   createdAt: string
   completedAt?: string
+  price?: number
 }
 
 export interface ListTemplate {

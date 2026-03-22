@@ -4,7 +4,8 @@
       "Bash(npm run build)",
       "Bash(xargs grep -l \"interface JournalEntry\")",
       "Bash(xargs grep -l \"JournalEntry\\\\s*=\")",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(xargs grep:*)"
     ]
   }
 }

@@ -89,6 +89,7 @@ export function DayLog() {
   const [activeIndex, setActiveIndex] = useState(0)
 
   const [entry, setEntry] = useState<T.DailyEntry>({ date })
+  const [lastWeight, setLastWeight] = useState<number | undefined>()
   const [habits, setHabits] = useState<T.Habit[]>([])
   const [categories, setCategories] = useState<T.HabitCategory[]>([])
   const [entryHabits, setEntryHabits] = useState<T.EntryHabit[]>([])
@@ -108,6 +109,17 @@ export function DayLog() {
   async function loadDay(d: string) {
     const e = await db.dailyEntries.get(d)
     setEntry(e || { date: d })
+
+    // Fetch last recorded weight for placeholder
+    if (!e?.weightKg) {
+      const recent = await db.dailyEntries
+        .where('date').below(d)
+        .reverse().sortBy('date')
+      const prev = recent.find(r => r.weightKg != null)
+      setLastWeight(prev?.weightKg)
+    } else {
+      setLastWeight(undefined)
+    }
     setCategories(await db.habitCategories.orderBy('sortOrder').toArray())
     const all = await db.habits.toArray()
     setHabits(all.filter(h => h.active).sort((a, b) => a.sortOrder - b.sortOrder))
@@ -190,11 +202,43 @@ export function DayLog() {
   async function startWorkout(routineId: number) {
     if (entryWorkouts.find(w => w.routineId === routineId)) return
     const exs = routineExercises.filter(e => e.routineId === routineId).sort((a, b) => a.sortOrder - b.sortOrder)
-    const exercises: T.EntryWorkoutExercise[] = exs.map(e => ({
-      exerciseCatalogId: e.exerciseCatalogId,
-      exerciseName: e.name,
-      sets: [{ reps: 10 }, { reps: 10 }, { reps: 10 }]
-    }))
+
+    // Find the last time this routine was done to pre-fill weights
+    const prevWorkouts = await db.entryWorkouts
+      .where('routineId').equals(routineId)
+      .toArray()
+    const prev = prevWorkouts
+      .filter(w => w.entryDate < date)
+      .sort((a, b) => b.entryDate.localeCompare(a.entryDate))[0]
+
+    // Build a map: exerciseCatalogId → last sets data
+    const lastExMap = new Map<number, T.WorkoutSetEntry[]>()
+    if (prev?.exercises) {
+      for (const ex of prev.exercises) {
+        lastExMap.set(ex.exerciseCatalogId, ex.sets)
+      }
+    }
+
+    const exercises: T.EntryWorkoutExercise[] = exs.map(e => {
+      const lastSets = lastExMap.get(e.exerciseCatalogId)
+      if (lastSets && lastSets.length > 0) {
+        // Pre-fill: use nextWeight if set, otherwise use the weight from last time
+        return {
+          exerciseCatalogId: e.exerciseCatalogId,
+          exerciseName: e.name,
+          sets: lastSets.map(s => ({
+            reps: s.reps,
+            weight: s.nextWeight ?? s.weight,
+          })),
+        }
+      }
+      return {
+        exerciseCatalogId: e.exerciseCatalogId,
+        exerciseName: e.name,
+        sets: [{ reps: 10 }, { reps: 10 }, { reps: 10 }],
+      }
+    })
+
     const id = await db.entryWorkouts.add({ entryDate: date, routineId, type: 'gym', exercises })
     setEntryWorkouts(p => [...p, { id: id as number, entryDate: date, routineId, type: 'gym', exercises }])
     showSaved()
@@ -539,7 +583,7 @@ export function DayLog() {
 
             {enabled.weight && (
               <section id="daylog-section-weight" data-daylog-section="weight" className={sectionClass('weight')} style={sectionStyle('weight')}>
-                <WeightSection entry={entry} isHorizontal={isHorizontal} onUpdate={upd} />
+                <WeightSection entry={entry} isHorizontal={isHorizontal} onUpdate={upd} lastWeight={lastWeight} />
               </section>
             )}
 

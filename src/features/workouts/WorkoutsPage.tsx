@@ -1,20 +1,21 @@
-﻿import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Plus, Pencil, Trash2, Dumbbell, X, Library, Search,
   BarChart3, Settings2, Activity, Bike, Footprints, Mountain,
   Trophy, Waves, ChevronDown, ChevronRight,
 } from 'lucide-react'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
+// recharts removed – charts live in InsightsView now
 import { db } from '@/data/db'
-import { Card } from '@/components/ui/Card'
+// Card removed – charts moved to InsightsView
 import { Modal } from '@/components/ui/Modal'
 import { SheetSelect } from '@/components/ui/SheetSelect'
 import { showSaved } from '@/utils/toast'
 import { useSectionPrefs } from '@/context/SectionPrefsContext'
 import { daysAgo, shortDate } from '@/utils/date'
-import type { Routine, RoutineExercise, ExerciseCatalog, EntryWorkout } from '@/data/types'
+import type { Routine, RoutineExercise, ExerciseCatalog, EntryWorkout, DailyEntry } from '@/data/types'
 import type * as T from '@/data/types'
+import { WorkoutInsightsView } from './WorkoutInsightsView'
 
 // ─── Activity type config ────────────────────────────────────────────────────
 const ACTIVITY_TYPES: { type: T.PhysicalActivityType; label: string; icon: any }[] = [
@@ -37,7 +38,7 @@ const ALL_FIELDS = Object.keys(FIELD_LABELS)
 
 const MUSCLE_GROUPS = ['Pecho', 'Espalda', 'Hombro', 'Bíceps', 'Tríceps', 'Pierna', 'Glúteo', 'Core', 'Cardio', 'Otros']
 
-const tt = { contentStyle: { background: '#1c1c26', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '12px', fontSize: '12px', color: '#fff' } }
+// tt tooltip removed – charts live in InsightsView now
 
 // ─── Main component ──────────────────────────────────────────────────────────
 export function WorkoutsPage() {
@@ -46,6 +47,7 @@ export function WorkoutsPage() {
   const [exercises, setExercises] = useState<RoutineExercise[]>([])
   const [catalog, setCatalog] = useState<ExerciseCatalog[]>([])
   const [allWorkouts, setAllWorkouts] = useState<EntryWorkout[]>([])
+  const [dailyEntries, setDailyEntries] = useState<DailyEntry[]>([])
   const [weekSets, setWeekSets] = useState<{ label: string; sets: number }[]>([])
 
   // ── Modals / sheets ──
@@ -55,7 +57,7 @@ export function WorkoutsPage() {
   const [detailRoutine, setDetailRoutine] = useState<Routine | null>(null)
   const [detailTab, setDetailTab] = useState<'catalog' | 'custom'>('catalog')
   const [catalogOpen, setCatalogOpen] = useState(false)
-  const [insightsOpen, setInsightsOpen] = useState(false)
+  const [view, setView] = useState<'routines' | 'insights'>('routines')
   const [sportsConfigOpen, setSportsConfigOpen] = useState(false)
   const [expandedSport, setExpandedSport] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<{ type: 'routine' | 'exercise'; id: number; name: string } | null>(null)
@@ -72,13 +74,14 @@ export function WorkoutsPage() {
   useEffect(() => { load() }, [])
 
   async function load() {
-    const [r, e, c, aw] = await Promise.all([
+    const [r, e, c, aw, de] = await Promise.all([
       db.routines.toArray(),
       db.routineExercises.toArray(),
       db.exerciseCatalog.toArray(),
       db.entryWorkouts.toArray(),
+      db.dailyEntries.toArray(),
     ])
-    setRoutines(r); setExercises(e); setCatalog(c); setAllWorkouts(aw)
+    setRoutines(r); setExercises(e); setCatalog(c); setAllWorkouts(aw); setDailyEntries(de)
     const w: { label: string; sets: number }[] = []
     for (let i = 6; i >= 0; i--) {
       const d = daysAgo(i)
@@ -138,17 +141,6 @@ export function WorkoutsPage() {
   // ── Derived data ──
   const groups = useMemo(() => [...new Set(catalog.map(c => c.muscleGroup))].sort(), [catalog])
 
-  const exFreq = useMemo(() => {
-    const freq: Record<string, number> = {}
-    allWorkouts.forEach(w => w.exercises.forEach(e => { freq[e.exerciseName] = (freq[e.exerciseName] || 0) + 1 }))
-    return freq
-  }, [allWorkouts])
-
-  const topEx = useMemo(() =>
-    Object.entries(exFreq).sort((a, b) => b[1] - a[1]).slice(0, 10),
-    [exFreq]
-  )
-
   const totalWeekSets = weekSets.reduce((s, d) => s + d.sets, 0)
 
   // ── Helpers for detail sheet ──
@@ -183,7 +175,6 @@ export function WorkoutsPage() {
   const navChips: NavItem[] = [
     { id: 'sports', label: 'Deportes', icon: Settings2, action: () => setSportsConfigOpen(true) },
     { id: 'catalog', label: 'Catálogo', icon: Library, action: () => setCatalogOpen(true) },
-    { id: 'insight', label: 'Insights', icon: BarChart3, action: () => setInsightsOpen(true) },
   ]
 
   // ─── Render ────────────────────────────────────────────────────────────────
@@ -192,101 +183,136 @@ export function WorkoutsPage() {
 
       {/* ── Hero header ── */}
       <div className="mb-5">
-        <h1 className="text-xl md:text-2xl font-bold">Actividad Física</h1>
-        <p className="text-xs text-white/30 mt-0.5">Rutinas · deportes · progreso</p>
-      </div>
-
-      {/* ── Chip nav (scroll horizontal on mobile) ── */}
-      <div className="flex items-center gap-2 mb-5 overflow-x-auto pb-1 snap-x snap-mandatory">
-        {navChips.map(chip => (
-          <motion.button
-            key={chip.id}
-            whileTap={{ scale: 0.95 }}
-            onClick={chip.action}
-            className="btn-secondary text-xs flex items-center gap-1.5 shrink-0 snap-start"
-          >
-            <chip.icon size={13} /> {chip.label}
-          </motion.button>
-        ))}
-        <motion.button
-          whileTap={{ scale: 0.95 }}
-          onClick={() => { setEditingRoutine(null); setRoutineName(''); setRoutineFormOpen(true) }}
-          className="btn-primary text-xs flex items-center gap-1.5 shrink-0 snap-start ml-auto"
-        >
-          <Plus size={14} /> Rutina
-        </motion.button>
-      </div>
-
-      {/* ── Week summary (compact) ── */}
-      {weekSets.some(d => d.sets > 0) && (
-        <Card className="mb-5 p-3" delay={0}>
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-[10px] text-white/30 uppercase tracking-widest font-semibold">Sets esta semana</p>
-            <span className="text-sm font-bold text-orange-400">{totalWeekSets}</span>
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h1 className="text-xl md:text-2xl font-bold">Actividad Física</h1>
+            <p className="text-xs text-white/30 mt-0.5">Rutinas · deportes · progreso</p>
           </div>
-          <ResponsiveContainer width="100%" height={80}>
-            <BarChart data={weekSets}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.04)" />
-              <XAxis dataKey="label" tick={{ fontSize: 9, fill: 'rgba(255,255,255,.25)' }} />
-              <YAxis tick={{ fontSize: 9, fill: 'rgba(255,255,255,.25)' }} width={18} />
-              <Tooltip {...tt} />
-              <Bar dataKey="sets" fill="#f97316" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </Card>
-      )}
 
-      {/* ── Routines section ── */}
-      <div className="mb-6">
-        <p className="text-[10px] text-white/30 uppercase tracking-widest font-semibold mb-3">Mis rutinas</p>
-        {routines.length === 0 ? (
-          <div className="glass-card p-8 text-center">
-            <Dumbbell size={36} className="text-white/10 mx-auto mb-3" />
-            <p className="text-sm text-white/30">Sin rutinas todavía</p>
-            <button onClick={() => { setEditingRoutine(null); setRoutineName(''); setRoutineFormOpen(true) }} className="btn-primary text-xs mt-3">
-              <Plus size={14} /> Crear rutina
+          <div className="flex items-center gap-2 shrink-0">
+            {(allWorkouts.length > 0 || weekSets.some(d => d.sets > 0)) && (
+              <button
+                onClick={() => setView(v => v === 'routines' ? 'insights' : 'routines')}
+                className={`btn-secondary text-xs flex items-center gap-1.5 ${view === 'insights' ? 'bg-accent/15 text-accent border-accent/30' : ''}`}
+              >
+                <BarChart3 size={13} />
+                <span className="hidden sm:inline">{view === 'insights' ? 'Rutinas' : 'Insights'}</span>
+              </button>
+            )}
+            <button
+              onClick={() => { setEditingRoutine(null); setRoutineName(''); setRoutineFormOpen(true) }}
+              className="btn-primary text-xs flex items-center gap-1.5"
+            >
+              <Plus size={14} /> <span className="hidden sm:inline">Nueva rutina</span><span className="sm:hidden">Rutina</span>
             </button>
           </div>
-        ) : (
-          <div className="space-y-2.5">
-            {routines.map((r, i) => {
-              const rExs = exercises.filter(e => e.routineId === r.id).sort((a, b) => a.sortOrder - b.sortOrder)
-              const previewNames = rExs.slice(0, 3).map(e => e.name)
-              return (
-                <motion.div
-                  key={r.id}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.04 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => { setDetailRoutine(r); setDetailTab('catalog'); setDetailCatSearch(''); setNewExName('') }}
-                  className="glass-card-hover p-3.5 cursor-pointer group"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-orange-400/10 flex items-center justify-center shrink-0">
-                      <Dumbbell size={18} className="text-orange-400" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <p className="font-semibold text-sm truncate group-hover:text-orange-400 transition-colors">{r.name}</p>
-                        <span className="text-[9px] text-white/20 bg-surface-300/50 px-1.5 py-0.5 rounded-full shrink-0">
-                          {rExs.length} ej.
-                        </span>
-                      </div>
-                      {previewNames.length > 0 && (
-                        <p className="text-[10px] text-white/25 mt-0.5 truncate">
-                          {previewNames.join(' · ')}{rExs.length > 3 && ` +${rExs.length - 3}`}
-                        </p>
-                      )}
-                    </div>
-                    <ChevronRight size={16} className="text-white/15 shrink-0" />
-                  </div>
-                </motion.div>
-              )
-            })}
-          </div>
-        )}
+        </div>
       </div>
+
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={view}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.15 }}
+        >
+          {view === 'routines' && (
+            <>
+              {/* ── Quick stats ── */}
+              {allWorkouts.length > 0 && (
+                <div className="flex items-center justify-center gap-5 mb-5 py-2">
+                  <div className="text-center">
+                    <p className="text-xl font-bold text-orange-400">{totalWeekSets}</p>
+                    <p className="text-[9px] uppercase tracking-widest text-white/30 font-semibold">Sets / sem</p>
+                  </div>
+                  <div className="w-px h-8 bg-white/[0.06]" />
+                  <div className="text-center">
+                    <p className="text-xl font-bold">{routines.length}</p>
+                    <p className="text-[9px] uppercase tracking-widest text-white/30 font-semibold">Rutinas</p>
+                  </div>
+                  <div className="w-px h-8 bg-white/[0.06]" />
+                  <div className="text-center">
+                    <p className="text-xl font-bold">{catalog.length}</p>
+                    <p className="text-[9px] uppercase tracking-widest text-white/30 font-semibold">Ejercicios</p>
+                  </div>
+                </div>
+              )}
+
+              {/* ── Routines section ── */}
+              <div className="mb-6">
+                <p className="text-[10px] text-white/30 uppercase tracking-widest font-semibold mb-3">Mis rutinas</p>
+                {routines.length === 0 ? (
+                  <div className="glass-card p-10 text-center">
+                    <Dumbbell size={36} className="text-white/10 mx-auto mb-3" />
+                    <p className="text-sm text-white/30">Sin rutinas todavía</p>
+                    <p className="text-xs text-white/20 mt-1">Crea tu primera rutina para empezar</p>
+                    <button onClick={() => { setEditingRoutine(null); setRoutineName(''); setRoutineFormOpen(true) }} className="btn-primary text-xs mt-4">
+                      <Plus size={14} /> Crear rutina
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-2.5">
+                    {routines.map((r, i) => {
+                      const rExs = exercises.filter(e => e.routineId === r.id).sort((a, b) => a.sortOrder - b.sortOrder)
+                      const previewNames = rExs.slice(0, 3).map(e => e.name)
+                      return (
+                        <motion.div
+                          key={r.id}
+                          initial={{ opacity: 0, y: 8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: i * 0.04 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() => { setDetailRoutine(r); setDetailTab('catalog'); setDetailCatSearch(''); setNewExName('') }}
+                          className="glass-card-hover p-3.5 cursor-pointer group"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-orange-400/10 flex items-center justify-center shrink-0">
+                              <Dumbbell size={18} className="text-orange-400" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2">
+                                <p className="font-semibold text-sm truncate group-hover:text-orange-400 transition-colors">{r.name}</p>
+                                <span className="text-[9px] text-white/20 bg-surface-300/50 px-1.5 py-0.5 rounded-full shrink-0">
+                                  {rExs.length} ej.
+                                </span>
+                              </div>
+                              {previewNames.length > 0 && (
+                                <p className="text-[10px] text-white/25 mt-0.5 truncate">
+                                  {previewNames.join(' · ')}{rExs.length > 3 && ` +${rExs.length - 3}`}
+                                </p>
+                              )}
+                            </div>
+                            <ChevronRight size={16} className="text-white/15 shrink-0" />
+                          </div>
+                        </motion.div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* ── Config buttons ── */}
+              <div className="flex items-center gap-2">
+                {navChips.map(chip => (
+                  <motion.button
+                    key={chip.id}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={chip.action}
+                    className="btn-secondary text-xs flex items-center gap-1.5 shrink-0"
+                  >
+                    <chip.icon size={13} /> {chip.label}
+                  </motion.button>
+                ))}
+              </div>
+            </>
+          )}
+
+          {view === 'insights' && (
+            <WorkoutInsightsView weekSets={weekSets} allWorkouts={allWorkouts} catalog={catalog} routines={routines} dailyEntries={dailyEntries} />
+          )}
+        </motion.div>
+      </AnimatePresence>
 
       {/* ══════════════════════════════════════════════════════════════════════
          MODALS / SHEETS
@@ -569,43 +595,6 @@ export function WorkoutsPage() {
           {catalogGroups.length === 0 && (
             <p className="text-xs text-white/20 text-center py-8">Sin ejercicios en el catálogo</p>
           )}
-        </div>
-      </Modal>
-
-      {/* ── Insights modal ── */}
-      <Modal open={insightsOpen} onClose={() => setInsightsOpen(false)} title="Insights de entrenamiento" size="md">
-        {/* Week chart */}
-        {weekSets.some(d => d.sets > 0) && (
-          <div className="mb-5">
-            <p className="text-[10px] text-white/30 uppercase tracking-widest font-semibold mb-2">Sets esta semana</p>
-            <div className="bg-surface-200/30 rounded-xl p-3 border border-white/[0.04]">
-              <ResponsiveContainer width="100%" height={100}>
-                <BarChart data={weekSets}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.04)" />
-                  <XAxis dataKey="label" tick={{ fontSize: 9, fill: 'rgba(255,255,255,.25)' }} />
-                  <YAxis tick={{ fontSize: 9, fill: 'rgba(255,255,255,.25)' }} width={18} />
-                  <Tooltip {...tt} />
-                  <Bar dataKey="sets" fill="#f97316" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        )}
-
-        {/* Top exercises */}
-        <p className="text-[10px] text-white/30 uppercase tracking-widest font-semibold mb-2">Top ejercicios (historial)</p>
-        <div className="space-y-1.5">
-          {topEx.map(([name, cnt], i) => (
-            <div key={name} className="flex items-center gap-3 px-3 py-2.5 bg-surface-200/40 rounded-xl">
-              <span className={`text-xs font-bold w-5 text-center shrink-0 ${i === 0 ? 'text-amber-400' : i === 1 ? 'text-white/50' : i === 2 ? 'text-orange-400/60' : 'text-white/20'
-                }`}>
-                {i + 1}
-              </span>
-              <span className="text-sm flex-1 truncate">{name}</span>
-              <span className="text-xs font-mono text-orange-400/70 shrink-0">{cnt}×</span>
-            </div>
-          ))}
-          {topEx.length === 0 && <p className="text-sm text-white/20 text-center py-8">Sin datos aún</p>}
         </div>
       </Modal>
 

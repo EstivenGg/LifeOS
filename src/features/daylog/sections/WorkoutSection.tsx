@@ -404,7 +404,7 @@ export function WorkoutSection({
                   <div key={exIdx} className="mb-4 last:mb-1">
                     <p className="text-xs font-semibold text-white/55 mb-2 pl-0.5">{ex.exerciseName}</p>
                     <div className="grid grid-cols-[1.75rem,1fr,1fr,1fr,2.75rem] gap-1.5 text-[9px] font-semibold text-white/25 uppercase tracking-wide mb-1.5 px-0.5">
-                      <span /><span className="text-center">Reps</span><span className="text-center">Kg</span><span className="text-center">RPE</span><span />
+                      <span /><span className="text-center">Reps</span><span className="text-center">Kg</span><span className="text-center">Próx</span><span />
                     </div>
                     <div className="space-y-1.5">
                       {ex.sets.map((s, si) => (
@@ -412,7 +412,7 @@ export function WorkoutSection({
                           <span className="text-[10px] text-white/20 text-center font-mono tabular-nums">{si + 1}</span>
                           <input type="number" inputMode="numeric" min="0" value={s.reps || ''} onChange={e => onUpdSet(w.id!, exIdx, si, { reps: parseInt(e.target.value) || 0 })} className="input-field h-11 px-1 text-center text-sm" />
                           <input type="number" inputMode="decimal" min="0" step="0.5" value={s.weight ?? ''} onChange={e => onUpdSet(w.id!, exIdx, si, { weight: e.target.value ? parseFloat(e.target.value) : undefined })} className="input-field h-11 px-1 text-center text-sm" placeholder="—" />
-                          <input type="number" inputMode="numeric" min="1" max="10" value={s.rpe ?? ''} onChange={e => onUpdSet(w.id!, exIdx, si, { rpe: e.target.value ? parseInt(e.target.value) : undefined })} className="input-field h-11 px-1 text-center text-sm" placeholder="—" />
+                          <input type="number" inputMode="decimal" min="0" step="0.5" value={s.nextWeight ?? ''} onChange={e => onUpdSet(w.id!, exIdx, si, { nextWeight: e.target.value ? parseFloat(e.target.value) : undefined })} className="input-field h-11 px-1 text-center text-sm text-orange-300/50" placeholder="—" />
                           <button onClick={() => onRmSet(w.id!, exIdx, si)} aria-label="Eliminar set" className="h-11 w-full flex items-center justify-center rounded-xl text-white/15 hover:text-red-400 hover:bg-red-400/10 transition-colors">
                             <Trash2 size={13} />
                           </button>
