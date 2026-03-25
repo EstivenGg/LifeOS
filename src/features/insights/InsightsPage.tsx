@@ -87,10 +87,15 @@ export function InsightsPage() {
 
   return (
     <div className="max-w-7xl mx-auto space-y-4 md:space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <TrendingUp size={20} className="text-accent" />
-          <h1 className="text-lg md:text-2xl font-bold">Insights</h1>
+      <div className="flex items-center justify-between gap-3 mb-1">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-accent/15 border border-accent/20 flex items-center justify-center shadow-[0_0_20px_rgb(var(--accent)/0.15)]">
+            <TrendingUp size={20} className="text-accent" />
+          </div>
+          <div>
+            <h1 className="text-xl md:text-2xl font-bold">Insights</h1>
+            <p className="text-xs text-white/30 mt-0.5">Resumen y tendencias</p>
+          </div>
         </div>
         <RangeSelector value={range} onChange={setRange} />
       </div>

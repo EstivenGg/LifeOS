@@ -298,15 +298,23 @@ export function MediaPage() {
   return (
     <div className="max-w-6xl mx-auto pb-6">
 
-      {/* Header — same structure as Books */}
+      {/* Header */}
       <div className="mb-5">
         <div className="flex items-center justify-between gap-3">
-          <h1 className="text-xl md:text-2xl font-bold truncate">Media</h1>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-accent/15 border border-accent/20 flex items-center justify-center shadow-[0_0_20px_rgb(var(--accent)/0.15)]">
+              <Film size={20} className="text-accent" />
+            </div>
+            <div>
+              <h1 className="text-xl md:text-2xl font-bold">Media</h1>
+              <p className="text-xs text-white/30 mt-0.5">Películas · series · valoraciones</p>
+            </div>
+          </div>
           <div className="flex items-center gap-2 shrink-0">
             {items.length > 0 && (
               <button
                 onClick={() => setView(v => v === 'list' ? 'stats' : 'list')}
-                className={`btn-secondary text-xs flex items-center gap-1.5 ${view === 'stats' ? 'bg-accent/15 text-accent' : ''}`}
+                className={`btn-secondary text-xs flex items-center gap-1.5 ${view === 'stats' ? 'bg-accent/15 text-accent border-accent/30' : ''}`}
               >
                 <BarChart2 size={13} />
                 <span className="hidden sm:inline">{view === 'stats' ? 'Lista' : 'Stats'}</span>

@@ -176,9 +176,16 @@ export function SleepPage() {
     <div className="max-w-4xl mx-auto pb-8">
       {/* ── Hero header ── */}
       <div className="mb-5">
-        <h1 className="text-xl md:text-2xl font-bold">Sueño</h1>
-        <p className="text-xs text-white/30 mt-0.5">Promedios, horario y consistencia</p>
-        <div className="mt-3 flex justify-center md:justify-start">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-10 h-10 rounded-2xl bg-accent/15 border border-accent/20 flex items-center justify-center shadow-[0_0_20px_rgb(var(--accent)/0.15)]">
+            <Moon size={20} className="text-accent" />
+          </div>
+          <div>
+            <h1 className="text-xl md:text-2xl font-bold">Sueño</h1>
+            <p className="text-xs text-white/30 mt-0.5">Promedios, horario y consistencia</p>
+          </div>
+        </div>
+        <div className="flex justify-center md:justify-start">
           <RangeSelector value={range} onChange={setRange} />
         </div>
       </div>

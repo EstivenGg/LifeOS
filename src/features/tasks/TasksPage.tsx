@@ -7,7 +7,7 @@ import {
   CalendarDays, Tag, Trash2, Pencil,
   X, Square, SquareCheckBig, ListTodo,
   AlertTriangle, Repeat, Copy,
-  CheckCheck, SlidersHorizontal,
+  CheckCheck, SlidersHorizontal, ClipboardList,
 } from 'lucide-react'
 import { db } from '@/data/db'
 import type { Task, TaskList, TaskStatus, ListTemplate } from '@/data/types'
@@ -558,17 +558,22 @@ export function TasksPage() {
   return (
     <div className="max-w-5xl mx-auto pb-12 animate-in fade-in duration-500">
       <div className="mb-6 flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight bg-gradient-to-br from-white to-white/50 bg-clip-text text-transparent">
-            {tab === 'lists' && !selectedListId ? 'Proyectos y Listas' : 'Tareas'}
-          </h1>
-          <p className="text-sm font-medium text-white/40 mt-1">
-            {tab === 'lists' && !selectedListId
-              ? 'Organiza por contexto y categorías'
-              : isListDetail
-                ? 'Gestiona la lista actual'
-                : 'Captura, foco y seguimiento'}
-          </p>
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-10 h-10 rounded-2xl bg-accent/15 border border-accent/20 flex items-center justify-center shadow-[0_0_20px_rgb(var(--accent)/0.15)] shrink-0">
+            <ClipboardList size={20} className="text-accent" />
+          </div>
+          <div className="min-w-0">
+            <h1 className="text-xl md:text-2xl font-bold">
+              {tab === 'lists' && !selectedListId ? 'Proyectos y Listas' : 'Tareas'}
+            </h1>
+            <p className="text-xs text-white/30 mt-0.5">
+              {tab === 'lists' && !selectedListId
+                ? 'Organiza por contexto y categorías'
+                : isListDetail
+                  ? 'Gestiona la lista actual'
+                  : 'Captura, foco y seguimiento'}
+            </p>
+          </div>
         </div>
 
         <div className="flex items-center gap-2 shrink-0">

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Play, Pause, RotateCcw, Maximize2, Minimize2, GraduationCap, Briefcase, MoreHorizontal } from 'lucide-react'
+import { Play, Pause, RotateCcw, Maximize2, Minimize2, GraduationCap, Briefcase, MoreHorizontal, Timer } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 import { db } from '@/data/db'
 import { today, daysAgo, shortDate } from '@/utils/date'
@@ -167,7 +167,15 @@ export function PomodoroPage() {
 
   return (
     <div className="max-w-4xl mx-auto">
-      <h1 className="text-2xl font-bold mb-6">Pomodoro</h1>
+      <div className="flex items-center gap-3 mb-6">
+        <div className="w-10 h-10 rounded-2xl bg-accent/15 border border-accent/20 flex items-center justify-center shadow-[0_0_20px_rgb(var(--accent)/0.15)]">
+          <Timer size={20} className="text-accent" />
+        </div>
+        <div>
+          <h1 className="text-xl md:text-2xl font-bold">Pomodoro</h1>
+          <p className="text-xs text-white/30 mt-0.5">Focus, descansos y progreso</p>
+        </div>
+      </div>
 
       <div className="flex flex-wrap gap-2 mb-6 justify-center">
         {(['work', 'shortBreak', 'longBreak'] as Phase[]).map(p => (

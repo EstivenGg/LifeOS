@@ -6,6 +6,7 @@ import {
   GraduationCap, Film, ClipboardList, TrendingUp, type LucideIcon,
 } from 'lucide-react'
 import { ThemeSelector } from '@/components/ui/ThemeSelector'
+import { ResetDataButton } from '@/components/ui/ResetDataButton'
 
 interface NavItem { to: string; icon: LucideIcon; label: string; end: boolean }
 interface NavGroup { label: string | null; items: NavItem[] }
@@ -129,6 +130,7 @@ export function Sidebar() {
           <p className="text-[9px] font-black text-white/18 uppercase tracking-[0.15em] text-center mb-2">Tema de color</p>
           <ThemeSelector />
         </div>
+        <ResetDataButton />
         <p className="text-[9px] text-white/12 text-center">LifeOS · Local-first · Bogotá 🇨🇴</p>
       </div>
 

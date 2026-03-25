@@ -158,7 +158,15 @@ export function ExportPage() {
 
   return (
     <div className="max-w-4xl mx-auto">
-      <h1 className="text-2xl font-bold mb-6">Exportar datos</h1>
+      <div className="flex items-center gap-3 mb-6">
+        <div className="w-10 h-10 rounded-2xl bg-accent/15 border border-accent/20 flex items-center justify-center shadow-[0_0_20px_rgb(var(--accent)/0.15)]">
+          <Download size={20} className="text-accent" />
+        </div>
+        <div>
+          <h1 className="text-xl md:text-2xl font-bold">Exportar datos</h1>
+          <p className="text-xs text-white/30 mt-0.5">JSON, CSV y Excel</p>
+        </div>
+      </div>
 
       <Card className="mb-5">
         <h3 className="text-sm font-semibold text-white/50 mb-3">Rango de exportación</h3>

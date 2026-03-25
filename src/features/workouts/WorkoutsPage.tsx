@@ -184,9 +184,14 @@ export function WorkoutsPage() {
       {/* ── Hero header ── */}
       <div className="mb-5">
         <div className="flex items-center justify-between gap-3">
-          <div>
-            <h1 className="text-xl md:text-2xl font-bold">Actividad Física</h1>
-            <p className="text-xs text-white/30 mt-0.5">Rutinas · deportes · progreso</p>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-accent/15 border border-accent/20 flex items-center justify-center shadow-[0_0_20px_rgb(var(--accent)/0.15)]">
+              <Dumbbell size={20} className="text-accent" />
+            </div>
+            <div>
+              <h1 className="text-xl md:text-2xl font-bold">Actividad Física</h1>
+              <p className="text-xs text-white/30 mt-0.5">Rutinas · deportes · progreso</p>
+            </div>
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
@@ -346,16 +351,17 @@ export function WorkoutsPage() {
               {detailExs.length === 0 ? (
                 <p className="text-xs text-white/20 text-center py-4">Sin ejercicios — agrega desde abajo</p>
               ) : (
-                <div className="space-y-1.5">
-                  {detailExs.map(ex => (
-                    <div key={ex.id} className="flex items-center gap-3 px-3 py-2.5 bg-surface-200/40 rounded-xl">
+                <div className="space-y-1.5 max-h-[30vh] overflow-y-auto pr-1">
+                  {detailExs.map((ex, i) => (
+                    <div key={ex.id} className="flex items-center gap-3 px-3 py-3 bg-surface-200/40 rounded-xl min-h-[48px]">
+                      <span className="text-[10px] text-white/20 font-bold w-4 text-center shrink-0">{i + 1}</span>
                       <div className="w-1.5 h-5 rounded-full bg-orange-400/30 shrink-0" />
                       <span className="text-sm truncate flex-1">{ex.name}</span>
                       <button
                         onClick={() => delExFromRoutine(ex.id!)}
-                        className="shrink-0 p-1.5 rounded-lg text-white/15 hover:text-red-400 hover:bg-red-400/10 transition-colors"
+                        className="shrink-0 w-9 h-9 flex items-center justify-center rounded-xl text-white/15 hover:text-red-400 hover:bg-red-400/10 active:bg-red-400/15 transition-colors"
                       >
-                        <X size={13} />
+                        <X size={15} />
                       </button>
                     </div>
                   ))}
@@ -366,12 +372,12 @@ export function WorkoutsPage() {
             {/* Add exercise — tabbed */}
             <div className="border-t border-white/[0.04] pt-3">
               <p className="text-[10px] text-white/30 uppercase tracking-widest font-semibold mb-2">Agregar ejercicio</p>
-              <div className="flex bg-surface-200/40 rounded-lg p-0.5 mb-3">
+              <div className="flex bg-surface-200/40 rounded-xl p-0.5 mb-3">
                 {(['catalog', 'custom'] as const).map(tab => (
                   <button
                     key={tab}
                     onClick={() => setDetailTab(tab)}
-                    className={`flex-1 py-1.5 rounded-md text-xs font-medium transition-all ${detailTab === tab ? 'bg-accent/15 text-accent' : 'text-white/30 hover:text-white/50'
+                    className={`flex-1 py-2.5 rounded-[10px] text-xs font-semibold transition-all ${detailTab === tab ? 'bg-accent/15 text-accent' : 'text-white/30 hover:text-white/50'
                       }`}
                   >
                     {tab === 'catalog' ? 'Catálogo' : 'Personalizado'}
@@ -381,29 +387,66 @@ export function WorkoutsPage() {
 
               {detailTab === 'catalog' && (
                 <>
-                  <input
-                    value={detailCatSearch}
-                    onChange={e => setDetailCatSearch(e.target.value)}
-                    className="input-field text-xs py-2 mb-2"
-                    placeholder="Buscar ejercicio..."
-                  />
-                  <div className="max-h-48 overflow-y-auto rounded-xl bg-surface-200/20 border border-white/[0.03]">
-                    {detailCatalogFiltered.length === 0 ? (
-                      <p className="text-xs text-white/20 text-center py-4">Sin resultados</p>
-                    ) : (
-                      detailCatalogFiltered.map(c => (
-                        <motion.button
-                          key={c.id}
-                          whileTap={{ scale: 0.97 }}
-                          onClick={() => addCatEx(detailRoutine.id!, c)}
-                          className="w-full text-left flex items-center justify-between px-3 py-2.5 hover:bg-surface-300/50 active:bg-surface-300/70 text-sm border-b border-white/[0.03] last:border-0 transition-colors"
-                        >
-                          <span className="truncate">{c.name}</span>
-                          <span className="text-[9px] text-white/20 ml-2 shrink-0 bg-surface-300/40 px-1.5 py-0.5 rounded-full">{c.muscleGroup}</span>
-                        </motion.button>
-                      ))
+                  {/* Search */}
+                  <div className="relative mb-3">
+                    <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/20 pointer-events-none" />
+                    <input
+                      value={detailCatSearch}
+                      onChange={e => setDetailCatSearch(e.target.value)}
+                      className="input-field text-sm py-3 pl-10"
+                      placeholder="Buscar ejercicio..."
+                    />
+                    {detailCatSearch && (
+                      <button
+                        onClick={() => setDetailCatSearch('')}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 w-7 h-7 flex items-center justify-center rounded-lg text-white/25 hover:text-white/50 active:bg-surface-300/50 transition-colors"
+                      >
+                        <X size={14} />
+                      </button>
                     )}
                   </div>
+
+                  {/* Catalog list grouped by muscle */}
+                  <div className="max-h-[38vh] overflow-y-auto rounded-2xl bg-surface-200/20 border border-white/[0.04]">
+                    {detailCatalogFiltered.length === 0 ? (
+                      <div className="text-center py-8">
+                        <Library size={24} className="text-white/10 mx-auto mb-2" />
+                        <p className="text-xs text-white/25">Sin resultados</p>
+                        <p className="text-[10px] text-white/15 mt-1">Prueba otra búsqueda o agrega personalizado</p>
+                      </div>
+                    ) : (
+                      (() => {
+                        const grouped = detailCatalogFiltered.reduce<Record<string, ExerciseCatalog[]>>((acc, c) => {
+                          ;(acc[c.muscleGroup] ??= []).push(c)
+                          return acc
+                        }, {})
+                        const sortedGroups = Object.keys(grouped).sort()
+                        return sortedGroups.map(group => (
+                          <div key={group}>
+                            <div className="sticky top-0 z-10 px-3 py-1.5 bg-surface-100/95 border-b border-white/[0.04]">
+                              <span className="text-[9px] font-bold text-white/25 uppercase tracking-widest">{group}</span>
+                            </div>
+                            {grouped[group].map(c => (
+                              <button
+                                key={c.id}
+                                onClick={() => addCatEx(detailRoutine.id!, c)}
+                                className="w-full text-left flex items-center gap-3 px-3 py-3.5 min-h-[52px] hover:bg-surface-300/40 active:bg-accent/10 border-b border-white/[0.03] last:border-0 transition-colors"
+                              >
+                                <div className="w-8 h-8 rounded-lg bg-surface-300/50 flex items-center justify-center shrink-0">
+                                  <Plus size={15} className="text-white/25" />
+                                </div>
+                                <span className="text-sm truncate flex-1">{c.name}</span>
+                                <span className="text-[9px] text-white/15 shrink-0 bg-surface-300/30 px-2 py-1 rounded-lg">{c.muscleGroup}</span>
+                              </button>
+                            ))}
+                          </div>
+                        ))
+                      })()
+                    )}
+                  </div>
+                  <p className="text-[10px] text-white/15 text-center mt-2">
+                    {detailCatalogFiltered.length} ejercicio{detailCatalogFiltered.length !== 1 ? 's' : ''} disponible{detailCatalogFiltered.length !== 1 ? 's' : ''}
+                  </p>
                 </>
               )}
 
@@ -414,10 +457,10 @@ export function WorkoutsPage() {
                     onChange={e => setNewExName(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && addCustomEx(detailRoutine.id!)}
                     placeholder="Nombre del ejercicio..."
-                    className="input-field text-sm flex-1"
+                    className="input-field text-sm py-3 flex-1"
                   />
-                  <button onClick={() => addCustomEx(detailRoutine.id!)} className="btn-primary px-4 shrink-0">
-                    <Plus size={16} />
+                  <button onClick={() => addCustomEx(detailRoutine.id!)} disabled={!newExName.trim()} className="btn-primary px-5 shrink-0 disabled:opacity-30">
+                    <Plus size={18} />
                   </button>
                 </div>
               )}

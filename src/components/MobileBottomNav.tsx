@@ -1,12 +1,13 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { NavLink } from 'react-router-dom'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import {
   LayoutDashboard, CalendarDays, BookOpen, Dumbbell, Moon, Download,
   ListChecks, PenLine, Scale, Timer, Smartphone, TrendingUp,
   GraduationCap, Film, LayoutGrid, X, ClipboardList, Droplet, type LucideIcon,
 } from 'lucide-react'
 import { ThemeSelector } from '@/components/ui/ThemeSelector'
+import { ResetDataButton } from '@/components/ui/ResetDataButton'
 
 /* ─── Route catalogue ────────────────────────────────────────────────────── */
 const ALL_NAV = [
@@ -27,7 +28,7 @@ const ALL_NAV = [
   { to: '/export',    icon: Download,      label: 'Exportar',  end: false },
 ] as const
 
-/** Quick-access tabs: Dashboard · Diario · FAB · Calendario · Insights */
+/** Quick-access tabs */
 const QUICK = [ALL_NAV[0], ALL_NAV[1], ALL_NAV[2], ALL_NAV[3]] as const
 
 /* ─── Z-index hierarchy ──────────────────────────────────────────────────── *
@@ -37,7 +38,7 @@ const QUICK = [ALL_NAV[0], ALL_NAV[1], ALL_NAV[2], ALL_NAV[3]] as const
  *  Bottom nav bar : z-[70]   ← always on top
  * ────────────────────────────────────────────────────────────────────────── */
 
-/* ─── Single quick-access tab ────────────────────────────────────────────── */
+/* ─── Quick-access tab ───────────────────────────────────────────────────── */
 interface TabProps { to: string; icon: LucideIcon; label: string; end: boolean }
 
 function Tab({ to, icon: Icon, label, end }: TabProps) {
@@ -70,129 +71,176 @@ function Tab({ to, icon: Icon, label, end }: TabProps) {
   )
 }
 
-const PANEL_SPRING = { type: 'spring', stiffness: 380, damping: 40, mass: 0.85 } as const
-
 /* ─── Main component ─────────────────────────────────────────────────────── */
 export function MobileBottomNav() {
   const [open, setOpen] = useState(false)
-  const close = () => setOpen(false)
+
+  const close = useCallback(() => setOpen(false), [])
+  const toggle = useCallback(() => setOpen(v => !v), [])
 
   return (
     <>
-      {/* ── Backdrop — z-[65] sits above carousel dock (z-[60]) ─────────── */}
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            key="backdrop"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-[65] bg-surface/80 backdrop-blur-md md:hidden"
-            onClick={close}
-            aria-hidden="true"
+      {/* ── Backdrop ─────────────────────────────────────────────────────── */}
+      <div
+        onClick={close}
+        aria-hidden="true"
+        className={`fixed inset-0 z-[65] md:hidden transition-opacity duration-300 ${
+          open ? 'opacity-100' : 'opacity-0 pointer-events-none'
+        }`}
+        style={{
+          background: 'radial-gradient(ellipse at 50% 100%, rgb(var(--accent) / 0.08) 0%, rgba(0,0,0,0.7) 70%)',
+        }}
+      />
+
+      {/* ── Bottom sheet ─────────────────────────────────────────────────── */}
+      <div
+        role="dialog"
+        aria-modal={open}
+        aria-label="Todas las secciones"
+        className={`fixed inset-x-0 bottom-0 z-[68] md:hidden transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] will-change-transform ${
+          open ? 'translate-y-0' : 'translate-y-full'
+        }`}
+      >
+        <div className="relative rounded-t-[28px] overflow-hidden"
+          style={{
+            background: 'linear-gradient(180deg, rgb(var(--surface-100)) 0%, rgb(var(--surface-50)) 100%)',
+          }}
+        >
+          {/* Top accent glow */}
+          <div
+            className="absolute inset-x-0 top-0 h-40 pointer-events-none"
+            style={{
+              background: 'radial-gradient(ellipse 70% 90px at 50% -20px, rgb(var(--accent) / 0.1) 0%, transparent 100%)',
+            }}
           />
-        )}
-      </AnimatePresence>
 
-      {/* ── Bottom sheet — z-[68] ────────────────────────────────────────── */}
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            key="sheet"
-            initial={{ y: '100%' }}
-            animate={{ y: 0 }}
-            exit={{ y: '100%' }}
-            transition={PANEL_SPRING}
-            role="dialog"
-            aria-modal="true"
-            aria-label="Todas las secciones"
-            className="fixed inset-x-0 bottom-0 z-[68] md:hidden"
-          >
-            <div className="bg-surface-100 rounded-t-[32px] border-t border-white/[0.08] shadow-[0_-12px_40px_rgba(0,0,0,0.6)] overflow-hidden">
+          {/* Top edge highlight */}
+          <div
+            className="absolute inset-x-0 top-0 h-px pointer-events-none"
+            style={{
+              background: 'linear-gradient(90deg, transparent 10%, rgb(var(--accent) / 0.3) 50%, transparent 90%)',
+            }}
+          />
 
-              {/* Handle */}
-              <div className="flex justify-center pt-3 pb-1" aria-hidden="true">
-                <div className="w-10 h-[3px] rounded-full bg-white/12" />
-              </div>
+          {/* Handle */}
+          <div className="relative flex justify-center pt-3 pb-1" aria-hidden="true">
+            <div
+              className="w-8 h-[3px] rounded-full transition-colors duration-300"
+              style={{
+                backgroundColor: open
+                  ? 'rgb(var(--accent) / 0.35)'
+                  : 'rgba(255,255,255,0.1)',
+              }}
+            />
+          </div>
 
-              {/* Header */}
-              <div className="flex items-center justify-between px-5 pt-1 pb-3">
-                <h2 className="text-sm font-black text-white/60 tracking-widest uppercase">Secciones</h2>
-                <motion.button
-                  whileTap={{ scale: 0.88 }}
-                  onClick={close}
-                  className="w-8 h-8 rounded-full bg-white/[0.07] border border-white/[0.06] flex items-center justify-center text-white/35 hover:text-white/60 transition-colors"
-                >
-                  <X size={15} strokeWidth={2.5} />
-                </motion.button>
-              </div>
+          {/* Header */}
+          <div className="relative flex items-center justify-between px-5 pt-1 pb-3">
+            <h2 className="text-[11px] font-black text-white/50 tracking-[0.2em] uppercase">
+              Secciones
+            </h2>
+            <button
+              onClick={close}
+              className="w-8 h-8 rounded-full bg-white/[0.06] border border-white/[0.06] flex items-center justify-center text-white/30 hover:text-white/60 active:scale-90 transition-all duration-150"
+            >
+              <X size={14} strokeWidth={2.5} />
+            </button>
+          </div>
 
-              {/* Nav grid */}
-              <nav aria-label="Navegacion completa" className="grid grid-cols-4 gap-1.5 px-3 pb-3">
-                {ALL_NAV.map((item) => (
-                  <NavLink
-                    key={item.to}
-                    to={item.to}
-                    end={item.end}
-                    onClick={close}
-                    aria-label={item.label}
-                    className="rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
-                  >
-                    {({ isActive }) => (
-                      <div
-                        className={`flex flex-col items-center gap-1.5 py-3 px-1 rounded-2xl transition-colors duration-150 ${
-                          isActive ? '' : 'active:bg-surface-200/60'
-                        }`}
-                      >
-                        {/* Icon container */}
-                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-200 ${
-                          isActive
-                            ? 'bg-accent/20 shadow-[0_0_18px_rgb(var(--accent)/0.25)]'
-                            : 'bg-surface-200/60 border border-white/[0.05]'
-                        }`}>
-                          <item.icon
-                            size={22}
-                            className={`transition-colors duration-150 ${isActive ? 'text-accent' : 'text-white/40'}`}
-                          />
-                        </div>
-
-                        {/* Label */}
-                        <span className={`text-[10px] font-semibold leading-tight text-center transition-colors duration-150 ${
-                          isActive ? 'text-accent' : 'text-white/40'
-                        }`}>
-                          {item.label}
-                        </span>
-
-                        {/* Active dot */}
-                        {isActive && (
-                          <motion.div
-                            layoutId="sheet-dot"
-                            className="w-1 h-1 rounded-full bg-accent"
-                            transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                          />
-                        )}
-                      </div>
-                    )}
-                  </NavLink>
-                ))}
-              </nav>
-
-              {/* Theme selector */}
-              <div
-                className="px-5 pt-3 pb-3 border-t border-white/[0.05] flex flex-col items-center gap-2.5"
-                style={{ paddingBottom: 'calc(104px + max(env(safe-area-inset-bottom, 0px), 10px))' }}
+          {/* Nav grid */}
+          <nav aria-label="Navegacion completa" className="relative grid grid-cols-4 gap-1 px-2.5 pb-2">
+            {ALL_NAV.map((item, i) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.end}
+                onClick={close}
+                aria-label={item.label}
+                className="rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+                style={{
+                  transitionDelay: open ? `${i * 20}ms` : '0ms',
+                }}
               >
-                <p className="text-[9px] font-black text-white/20 uppercase tracking-[0.15em]">Tema de color</p>
-                <ThemeSelector />
-              </div>
+                {({ isActive }) => (
+                  <div
+                    className={`flex flex-col items-center gap-1.5 py-3 px-1 rounded-2xl transition-all duration-200 ${
+                      isActive ? '' : 'active:scale-[0.93]'
+                    }`}
+                    style={{
+                      opacity: open ? 1 : 0,
+                      transform: open ? 'translateY(0)' : 'translateY(8px)',
+                      transition: `opacity 250ms ease, transform 250ms ease`,
+                      transitionDelay: open ? `${60 + i * 25}ms` : '0ms',
+                    }}
+                  >
+                    {/* Icon container */}
+                    <div
+                      className={`relative w-[50px] h-[50px] rounded-[16px] flex items-center justify-center transition-all duration-200 ${
+                        isActive
+                          ? ''
+                          : 'bg-white/[0.04] border border-white/[0.06]'
+                      }`}
+                      style={isActive ? {
+                        background: `linear-gradient(135deg, rgb(var(--accent) / 0.2) 0%, rgb(var(--accent) / 0.08) 100%)`,
+                        border: '1px solid rgb(var(--accent) / 0.2)',
+                        boxShadow: '0 0 20px rgb(var(--accent) / 0.15), inset 0 1px 0 rgb(var(--accent) / 0.1)',
+                      } : undefined}
+                    >
+                      <item.icon
+                        size={21}
+                        strokeWidth={isActive ? 2.2 : 1.8}
+                        className={`transition-colors duration-150 ${isActive ? 'text-accent' : 'text-white/35'}`}
+                      />
+                    </div>
 
+                    {/* Label */}
+                    <span className={`text-[10px] font-semibold leading-tight text-center transition-colors duration-150 ${
+                      isActive ? 'text-accent' : 'text-white/35'
+                    }`}>
+                      {item.label}
+                    </span>
+
+                    {/* Active bar */}
+                    <div
+                      className="h-[2px] rounded-full transition-all duration-200"
+                      style={{
+                        width: isActive ? 16 : 0,
+                        backgroundColor: isActive ? 'rgb(var(--accent) / 0.6)' : 'transparent',
+                        boxShadow: isActive ? '0 0 8px rgb(var(--accent) / 0.4)' : 'none',
+                      }}
+                    />
+                  </div>
+                )}
+              </NavLink>
+            ))}
+          </nav>
+
+          {/* Divider with accent gradient */}
+          <div className="mx-5 h-px" style={{
+            background: 'linear-gradient(90deg, transparent 0%, rgb(var(--accent) / 0.15) 50%, transparent 100%)',
+          }} />
+
+          {/* Theme selector */}
+          <div
+            className="px-5 pt-4 pb-3 flex flex-col items-center gap-3"
+            style={{
+              paddingBottom: 'calc(104px + max(env(safe-area-inset-bottom, 0px), 10px))',
+              opacity: open ? 1 : 0,
+              transition: 'opacity 300ms ease',
+              transitionDelay: open ? '350ms' : '0ms',
+            }}
+          >
+            <p className="text-[9px] font-black text-white/15 uppercase tracking-[0.2em]">Tema</p>
+            <ThemeSelector />
+            <div className="mt-2 pt-2 border-t border-white/[0.04]">
+              <ResetDataButton />
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          </div>
 
-      {/* ── Floating pill nav — z-[70] always on top ───────────────────── */}
+        </div>
+      </div>
+
+      {/* ── Floating pill nav — z-[70] always on top ─────────────────────── */}
       <nav
         aria-label="Navegacion principal"
         className="fixed bottom-0 inset-x-0 z-[70] md:hidden pointer-events-none"
@@ -201,52 +249,60 @@ export function MobileBottomNav() {
           className="pointer-events-auto mx-3 relative"
           style={{ marginBottom: 'max(env(safe-area-inset-bottom, 0px), 10px)' }}
         >
-          {/* FAB — floats above pill */}
+          {/* FAB */}
           <div className="absolute left-1/2 -translate-x-1/2 -top-[26px] z-20">
-            <motion.button
+            {/* Glow ring behind FAB when open */}
+            <div
+              className="absolute inset-0 rounded-[18px] transition-all duration-500"
+              style={{
+                boxShadow: open
+                  ? '0 0 0 3px rgb(var(--accent) / 0.15), 0 0 30px rgb(var(--accent) / 0.3)'
+                  : '0 0 0 0px transparent, 0 0 0px transparent',
+              }}
+            />
+            <button
               type="button"
-              onClick={() => setOpen(v => !v)}
+              onClick={toggle}
               aria-expanded={open}
               aria-haspopup="dialog"
               aria-label={open ? 'Cerrar menu' : 'Abrir todas las secciones'}
-              className="w-[52px] h-[52px] rounded-[18px] bg-accent flex items-center justify-center shadow-[0_8px_24px_rgb(var(--accent)/0.5)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/50 focus-visible:outline-offset-2"
-              whileTap={{ scale: 0.85 }}
-              transition={{ type: 'spring', stiffness: 600, damping: 25 }}
+              className="relative w-[52px] h-[52px] rounded-[18px] bg-accent flex items-center justify-center active:scale-[0.85] transition-transform duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/50 focus-visible:outline-offset-2"
+              style={{
+                boxShadow: `0 8px 24px rgb(var(--accent) / 0.45), 0 2px 8px rgb(var(--accent) / 0.3)`,
+              }}
             >
+              {/* Glass highlight */}
               <span
                 className="absolute inset-0 rounded-[18px] pointer-events-none"
-                style={{ background: 'linear-gradient(160deg, rgba(255,255,255,0.22) 0%, transparent 55%)' }}
+                style={{ background: 'linear-gradient(160deg, rgba(255,255,255,0.25) 0%, transparent 50%)' }}
               />
-              <AnimatePresence mode="wait" initial={false}>
-                {open ? (
-                  <motion.span
-                    key="x"
-                    initial={{ rotate: -90, opacity: 0, scale: 0.5 }}
-                    animate={{ rotate: 0, opacity: 1, scale: 1 }}
-                    exit={{ rotate: 90, opacity: 0, scale: 0.5 }}
-                    transition={{ type: 'spring', stiffness: 600, damping: 28 }}
-                    className="relative z-10"
-                  >
-                    <X size={21} className="text-white" strokeWidth={2.5} />
-                  </motion.span>
-                ) : (
-                  <motion.span
-                    key="grid"
-                    initial={{ rotate: 90, opacity: 0, scale: 0.5 }}
-                    animate={{ rotate: 0, opacity: 1, scale: 1 }}
-                    exit={{ rotate: -90, opacity: 0, scale: 0.5 }}
-                    transition={{ type: 'spring', stiffness: 600, damping: 28 }}
-                    className="relative z-10"
-                  >
-                    <LayoutGrid size={21} className="text-white" />
-                  </motion.span>
-                )}
-              </AnimatePresence>
-            </motion.button>
+              {/* Icon swap */}
+              <div className="relative z-10 w-[21px] h-[21px]">
+                <LayoutGrid
+                  size={21}
+                  className={`absolute inset-0 text-white transition-all duration-200 ${
+                    open ? 'opacity-0 rotate-90 scale-50' : 'opacity-100 rotate-0 scale-100'
+                  }`}
+                />
+                <X
+                  size={21}
+                  strokeWidth={2.5}
+                  className={`absolute inset-0 text-white transition-all duration-200 ${
+                    open ? 'opacity-100 rotate-0 scale-100' : 'opacity-0 -rotate-90 scale-50'
+                  }`}
+                />
+              </div>
+            </button>
           </div>
 
           {/* Pill */}
-          <div className="bg-surface-50/95 backdrop-blur-md rounded-[26px] border border-white/[0.08] shadow-[0_8px_40px_rgba(0,0,0,0.5),0_0_0_1px_rgba(255,255,255,0.03)] h-[62px] flex items-center px-1">
+          <div
+            className="rounded-[26px] border border-white/[0.08] h-[62px] flex items-center px-1"
+            style={{
+              background: 'linear-gradient(180deg, rgb(var(--surface-100) / 0.97) 0%, rgb(var(--surface-50) / 0.95) 100%)',
+              boxShadow: '0 8px 40px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.03), inset 0 1px 0 rgba(255,255,255,0.05)',
+            }}
+          >
             <Tab {...QUICK[0]} />
             <Tab {...QUICK[1]} />
             <div className="w-[64px] shrink-0" />
