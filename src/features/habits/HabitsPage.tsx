@@ -97,11 +97,22 @@ export function HabitsPage() {
   }
 
   async function loadInsights() {
-    const allH = await db.habits.toArray()
+    const [allH, allEntries] = await Promise.all([
+      db.habits.toArray(),
+      db.entryHabits.where('entryDate').between(daysAgo(364), today(), true, true).toArray(),
+    ])
     const activeH = allH.filter(h => h.active)
     if (activeH.length === 0) return
 
     const days = Math.min(rangeToDays(range), 365)
+
+    // Group entries by date in memory — evita N queries secuenciales
+    const byDate = new Map<string, typeof allEntries>()
+    for (const e of allEntries) {
+      if (!byDate.has(e.entryDate)) byDate.set(e.entryDate, [])
+      byDate.get(e.entryDate)!.push(e)
+    }
+
     const chart: { label: string; pct: number }[] = []
     let sumPct = 0, daysCount = 0, tDone = 0, best = 0
 
@@ -111,7 +122,7 @@ export function HabitsPage() {
     for (let i = days - 1; i >= 0; i--) {
       const dt = daysAgo(i)
       const lbl = shortDate(dt)
-      const dayH = await db.entryHabits.where('entryDate').equals(dt).toArray()
+      const dayH = byDate.get(dt) ?? []
       const done = dayH.filter(h => h.done).length
       const pct = activeH.length > 0 ? Math.round((done / activeH.length) * 100) : 0
       chart.push({ label: lbl, pct })
@@ -142,11 +153,11 @@ export function HabitsPage() {
     })).sort((a, b) => b.pct - a.pct)
     setHabitRates(rates)
 
-    /* streak */
+    /* streak — usando los datos ya cargados */
     let s = 0
     for (let i = 0; i < 365; i++) {
       const dt = daysAgo(i)
-      const dayH = await db.entryHabits.where('entryDate').equals(dt).toArray()
+      const dayH = byDate.get(dt) ?? []
       const done = dayH.filter(h => h.done).length
       if (done === activeH.length && s === i) s++
       else if (s !== i) break
@@ -359,15 +370,8 @@ export function HabitsPage() {
                   <div key={cat.id} className="mb-5">
                     <p className="text-[10px] uppercase tracking-wider text-white/25 mb-2 px-1">{cat.name}</p>
                     <SortableContext items={items.map(h => h.id!)} strategy={verticalListSortingStrategy}>
-                      {items.map((h, i) => (
-                        <motion.div
-                          key={h.id}
-                          initial={{ opacity: 0, y: 6 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: (gi * items.length + i) * 0.03 }}
-                        >
-                          <SortableItem habit={h} onEdit={openEdit} onArchive={archive} />
-                        </motion.div>
+                      {items.map((h) => (
+                        <SortableItem key={h.id} habit={h} onEdit={openEdit} onArchive={archive} />
                       ))}
                     </SortableContext>
                   </div>
@@ -388,12 +392,9 @@ export function HabitsPage() {
                 <div className="mt-8">
                   <p className="text-[10px] uppercase tracking-wider text-white/25 mb-2 px-1">Archivados</p>
                   <div className="space-y-1.5">
-                    {archived.map((h, i) => (
-                      <motion.div
+                    {archived.map((h) => (
+                      <div
                         key={h.id}
-                        initial={{ opacity: 0, y: 6 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: i * 0.03 }}
                         className="glass-card flex items-center justify-between px-4 py-2.5 opacity-60"
                       >
                         <span className="line-through text-sm text-white/40">{h.name}</span>
@@ -407,7 +408,7 @@ export function HabitsPage() {
                             <X size={12} /> Eliminar
                           </button>
                         </div>
-                      </motion.div>
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -425,11 +426,9 @@ export function HabitsPage() {
                   { icon: <Flame size={17} className="text-orange-400" />, bg: 'bg-orange-500/10', label: 'Racha', value: `${streak}d` },
                   { icon: <CheckCircle2 size={17} className="text-accent" />, bg: 'bg-accent/10', label: 'Completados', value: String(totalDone) },
                   { icon: <TrendingUp size={17} className="text-violet-400" />, bg: 'bg-violet-500/10', label: 'Mejor día', value: `${bestDay}%` },
-                ].map((s, i) => (
-                  <motion.div
+                ].map((s) => (
+                  <div
                     key={s.label}
-                    initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.06 }}
                     className="glass-card p-3 flex items-center gap-3"
                   >
                     <div className={`w-9 h-9 rounded-xl ${s.bg} flex items-center justify-center shrink-0`}>
@@ -439,7 +438,7 @@ export function HabitsPage() {
                       <p className="text-[10px] text-white/30 uppercase tracking-wider font-semibold">{s.label}</p>
                       <p className="text-lg font-bold tabular-nums leading-tight font-mono">{s.value}</p>
                     </div>
-                  </motion.div>
+                  </div>
                 ))}
               </div>
 
@@ -486,12 +485,7 @@ export function HabitsPage() {
                   <h3 className="text-sm font-semibold text-white/50 mb-4">Por hábito</h3>
                   <div className="space-y-3">
                     {habitRates.map((h, i) => (
-                      <motion.div
-                        key={h.name}
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: 0.25 + i * 0.04 }}
-                      >
+                      <div key={h.name}>
                         <div className="flex items-center justify-between mb-1">
                           <span className="text-xs font-medium truncate mr-2">{h.name}</span>
                           <div className="flex items-center gap-2 shrink-0">
@@ -510,7 +504,7 @@ export function HabitsPage() {
                             transition={{ duration: 0.6, delay: 0.3 + i * 0.04 }}
                           />
                         </div>
-                      </motion.div>
+                      </div>
                     ))}
                   </div>
                 </Card>

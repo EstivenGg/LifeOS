@@ -77,7 +77,7 @@ export function ScreenTimeSection({ entry, isHorizontal, apps, sortedApps, impor
     <button
       onClick={onImport}
       disabled={importing}
-      className="flex items-center gap-1.5 px-3 py-2 bg-pink-400/10 hover:bg-pink-400/20 text-pink-400/60 hover:text-pink-400 rounded-xl border border-pink-400/15 transition-all disabled:opacity-50 text-xs font-bold"
+      className="flex items-center gap-1.5 px-3 py-2 bg-pink-400/10 hover:bg-pink-400/20 text-pink-400/60 hover:text-pink-400 rounded-xl border border-pink-400/15 transition-colors disabled:opacity-50 text-xs font-bold active:scale-95"
     >
       <motion.div
         animate={{ rotate: importing ? 360 : 0 }}
@@ -156,11 +156,9 @@ export function ScreenTimeSection({ entry, isHorizontal, apps, sortedApps, impor
           <div className="relative w-32 h-32 sm:w-36 sm:h-36 flex items-center justify-center">
             <div className="absolute inset-0 rounded-full border-2 border-pink-400/15" />
             <div className="absolute inset-2 rounded-full border border-pink-400/5" />
-            <motion.div
+            <div
               className="absolute inset-0 rounded-full"
               style={{ background: 'radial-gradient(circle, rgba(244,114,182,0.12) 0%, transparent 70%)' }}
-              animate={{ scale: [1, 1.06, 1] }}
-              transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
             />
             <div className="relative z-10 flex flex-col items-center">
               {totalMins > 0 ? (
@@ -192,12 +190,9 @@ export function ScreenTimeSection({ entry, isHorizontal, apps, sortedApps, impor
           <p className="text-[9px] font-black uppercase tracking-[0.2em] text-white/20 shrink-0 px-1">Top apps</p>
           {topApps.length === 0 ? (
             <div className="flex-1 flex flex-col items-center justify-center text-center gap-2 py-6 rounded-[20px] border border-white/5 bg-surface-200/20">
-              <motion.div
-                animate={{ scale: [1, 1.05, 1], opacity: [0.15, 0.3, 0.15] }}
-                transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-              >
+              <div className="opacity-25">
                 <Smartphone size={28} className="text-white/20" />
-              </motion.div>
+              </div>
               <p className="text-xs text-white/20 mt-1">Sin datos de apps</p>
             </div>
           ) : (

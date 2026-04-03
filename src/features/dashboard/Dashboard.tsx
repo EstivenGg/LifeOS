@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
@@ -8,12 +8,10 @@ import {
 } from 'lucide-react'
 import { db } from '@/data/db'
 import { today, daysAgo, fmtMin, displayDate } from '@/utils/date'
-import { Card } from '@/components/ui/Card'
 import { getMoodColor } from '@/components/ui/MoodPicker'
 import { SectionPrefsModal } from '@/components/ui/SectionPrefsModal'
 import { DashboardModal } from './DashboardModal'
-import { useSectionPrefs, SectionId } from '@/context/SectionPrefsContext'
-import { useTheme } from '@/context/ThemeContext'
+import { useSectionPrefs, SectionId, useWeightUnit } from '@/context/SectionPrefsContext'
 
 /* ─── Progress ring ──────────────────────────────────────────────────────── */
 function ProgressRing({ pct, size = 120, stroke = 8 }: { pct: number; size?: number; stroke?: number }) {
@@ -78,26 +76,30 @@ function greeting() {
 export function Dashboard() {
   const navigate = useNavigate()
   const { enabled, advanced, dashboardOrder } = useSectionPrefs()
-  const { accentHex } = useTheme()
+  const { unit, kgToDisplay } = useWeightUnit()
   const [selectedDate, setSelectedDate] = useState(today())
   const [s, setS] = useState<Summary | null>(null)
   const [week, setWeek] = useState<WeekDay[]>([])
   const [showPrefs, setShowPrefs] = useState(false)
   const [modalMetric, setModalMetric] = useState<{ id: SectionId, label: string, value: string, navSection?: string } | null>(null)
 
-  useEffect(() => { load() }, [selectedDate])
+  useEffect(() => { load() }, [selectedDate, enabled, advanced])
 
   async function load() {
     const d = selectedDate
-    const allH = await db.habits.toArray()
-    const habits = allH.filter(h => h.active)
-    const entry = await db.dailyEntries.get(d)
-    const eh = await db.entryHabits.where('entryDate').equals(d).toArray()
-    const readings = await db.entryReadings.where('entryDate').equals(d).toArray()
-    const workouts = await db.entryWorkouts.where('entryDate').equals(d).toArray()
-    const poms = await db.pomodoroSessions.where('entryDate').equals(d).toArray()
-    const studies = await db.entryStudy.where('entryDate').equals(d).toArray()
 
+    // Batch all queries for selected date in parallel
+    const [allH, entry, eh, readings, workouts, poms, studies] = await Promise.all([
+      db.habits.toArray(),
+      db.dailyEntries.get(d),
+      db.entryHabits.where('entryDate').equals(d).toArray(),
+      db.entryReadings.where('entryDate').equals(d).toArray(),
+      db.entryWorkouts.where('entryDate').equals(d).toArray(),
+      db.pomodoroSessions.where('entryDate').equals(d).toArray(),
+      db.entryStudy.where('entryDate').equals(d).toArray(),
+    ])
+
+    const habits = allH.filter(h => h.active)
     const pagesRead = readings.reduce((s, r) => s + r.pagesRead, 0)
     const trained = entry?.workoutDone === true || (workouts.length > 0 && workouts.some(w =>
       (w.type && w.type !== 'gym') || (w.exercises?.some(e => e.sets?.length > 0))
@@ -128,22 +130,27 @@ export function Dashboard() {
       advOverrides: entry?.advancedOverrides,
     })
 
-    const weekDays: WeekDay[] = []
+    // Batch week-strip queries: collect all 7 dates, then query in parallel
+    const weekDates = Array.from({ length: 7 }, (_, i) => daysAgo(6 - i))
+    const [weekEntries, weekHabits] = await Promise.all([
+      Promise.all(weekDates.map(dt => db.dailyEntries.get(dt))),
+      Promise.all(weekDates.map(dt => db.entryHabits.where('entryDate').equals(dt).toArray())),
+    ])
+
     const dayNames = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb']
-    for (let i = 6; i >= 0; i--) {
-      const dt = daysAgo(i)
-      const e = await db.dailyEntries.get(dt)
-      const dayH = await db.entryHabits.where('entryDate').equals(dt).toArray()
+    const weekDays: WeekDay[] = weekDates.map((dt, i) => {
+      const e = weekEntries[i]
+      const dayH = weekHabits[i]
       const dateObj = new Date(dt + 'T12:00:00')
-      weekDays.push({
+      return {
         label: dayNames[dateObj.getDay()],
         date: dt,
         mood: e?.mood,
         habitsDone: dayH.filter(h => h.done).length,
         habitsTotal: habits.length,
         hasEntry: !!e,
-      })
-    }
+      }
+    })
     setWeek(weekDays)
   }
 
@@ -161,7 +168,7 @@ export function Dashboard() {
   const habitPctHero = (s?.checklistTotal ?? 0) > 0 ? (s!.checklistDone / s!.checklistTotal) * 100 : 0
   const actPctHero   = (s?.measurableTotal ?? 0) > 0 ? (s!.measurableDone / s!.measurableTotal) * 100 : 0
 
-  function getMetricValue(id: SectionId): { label: string; value: string; sub?: string; navSection?: string } | null {
+  const getMetricValue = useCallback((id: SectionId): { label: string; value: string; sub?: string; navSection?: string } | null => {
     if (!s) return null
     const isAdv = s.advOverrides?.[id] ?? advanced[id]
     switch (id) {
@@ -187,12 +194,12 @@ export function Dashboard() {
       case 'meditation':
         if (isAdv) return { label: 'Meditación', value: s.meditationMin ? `${s.meditationMin}m` : '—',           navSection: 'meditation' }
         return             { label: 'Meditación', value: s.meditOk ? 'Sí' : '—',                                  navSection: 'meditation' }
-      case 'weight':     return { label: 'Peso',       value: s.weightKg ? `${s.weightKg}kg` : '—',                navSection: 'weight'     }
+      case 'weight':     return { label: 'Peso',       value: s.weightKg ? `${kgToDisplay(s.weightKg)}${unit}` : '—', navSection: 'weight'     }
       default:           return null
     }
-  }
+  }, [s, advanced])
 
-  const visibleMetrics = dashboardOrder.filter(id => {
+  const visibleMetrics = useMemo(() => dashboardOrder.filter(id => {
     if (enabled[id]) return true
     if (!s) return false
     switch (id) {
@@ -208,7 +215,7 @@ export function Dashboard() {
       case 'weight':     return s.weightKg !== undefined
       default:           return false
     }
-  })
+  }), [dashboardOrder, enabled, s])
 
   // ── Render ──────────────────────────────────────────────────────────────
   return (
@@ -225,69 +232,64 @@ export function Dashboard() {
           </h1>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           {/* Date nav */}
-          <div className="flex items-center gap-1">
-            <motion.button
-              whileTap={{ scale: 0.9 }}
+          <div className="flex items-center gap-0.5">
+            <button
               onClick={() => goDate(-1)}
-              className="w-8 h-8 rounded-full bg-surface-200/50 flex items-center justify-center text-white/40 hover:text-white border border-white/[0.04] transition-all"
+              className="w-8 h-8 rounded-full bg-surface-200/50 flex items-center justify-center text-white/40 active:scale-90 active:bg-surface-300/60 border border-white/[0.04] transition-transform"
             >
               <ChevronLeft size={15} />
-            </motion.button>
+            </button>
             {selectedDate !== today() && (
-              <motion.button
-                whileTap={{ scale: 0.95 }}
+              <button
                 onClick={() => setSelectedDate(today())}
-                className="px-3 h-8 rounded-full text-xs font-bold text-accent bg-accent/10 border border-accent/20 hover:bg-accent/20 transition-all"
+                className="px-2.5 h-8 rounded-full text-[11px] font-bold text-accent bg-accent/10 border border-accent/20 active:bg-accent/25 transition-colors"
               >
                 Hoy
-              </motion.button>
+              </button>
             )}
-            <motion.button
-              whileTap={{ scale: 0.9 }}
+            <button
               onClick={() => goDate(1)}
               disabled={selectedDate >= today()}
-              className="w-8 h-8 rounded-full bg-surface-200/50 flex items-center justify-center text-white/40 hover:text-white border border-white/[0.04] transition-all disabled:opacity-25 disabled:cursor-not-allowed"
+              className="w-8 h-8 rounded-full bg-surface-200/50 flex items-center justify-center text-white/40 active:scale-90 active:bg-surface-300/60 border border-white/[0.04] transition-transform disabled:opacity-25"
             >
               <ChevronRight size={15} />
-            </motion.button>
+            </button>
           </div>
 
-          <motion.button
-            whileTap={{ scale: 0.9 }}
+          <button
             onClick={() => setShowPrefs(true)}
-            className="w-9 h-9 rounded-xl bg-surface-200/50 flex items-center justify-center text-white/35 hover:text-white/70 border border-white/[0.04] transition-all"
+            className="w-8 h-8 rounded-xl bg-surface-200/50 flex items-center justify-center text-white/35 active:scale-90 active:bg-surface-300/60 border border-white/[0.04] transition-transform"
             title="Personalizar"
           >
-            <Settings2 size={16} />
-          </motion.button>
+            <Settings2 size={15} />
+          </button>
         </div>
       </div>
 
       {/* ── Hero card — tappable → opens diary ── */}
-      <motion.div
-        whileTap={{ scale: 0.985 }}
+      <div
         onClick={() => navigate(`/daylog/${selectedDate}`)}
-        className="glass-card p-5 cursor-pointer relative group active:bg-surface-200/60 transition-colors"
+        className="bg-surface-100/80 border border-white/[0.05] rounded-[24px] shadow-[0_8px_32px_rgba(0,0,0,0.15)] p-4 sm:p-5 cursor-pointer relative group active:scale-[0.985] active:bg-surface-200/60 transition-transform"
       >
         {/* PenLine hint top-right */}
         <div className="absolute top-4 right-4 w-7 h-7 rounded-lg bg-white/[0.05] group-hover:bg-accent/15 flex items-center justify-center transition-all duration-200">
           <PenLine size={13} className="text-white/20 group-hover:text-accent transition-colors duration-200" />
         </div>
 
-        <div className="flex items-center gap-5">
+        <div className="flex items-center gap-3 sm:gap-5">
           {/* Ring */}
           <div className="relative shrink-0">
-            <ProgressRing pct={pct} size={112} stroke={8} />
+            <ProgressRing pct={pct} size={92} stroke={7} />
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-              <span className="text-3xl font-black text-white leading-none tabular-nums">{pct}</span>
-              <span className="text-[9px] font-black text-white/30 uppercase tracking-widest">%</span>
+              <span className="text-2xl font-black text-white leading-none tabular-nums">{pct}</span>
+              <span className="text-[8px] font-black text-white/30 uppercase tracking-widest">%</span>
             </div>
           </div>
 
           {/* Stats */}
-          <div className="flex-1 min-w-0 space-y-3 pr-6">
+          <div className="flex-1 min-w-0 space-y-3 pr-4 sm:pr-6">
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <span className="text-[10px] font-black text-white/30 uppercase tracking-widest">Hábitos</span>
@@ -322,10 +324,10 @@ export function Dashboard() {
             </div>
           </div>
         </div>
-      </motion.div>
+      </div>
 
       {/* ── 7-day strip ── */}
-      <div className="flex gap-1.5">
+      <div className="flex gap-1">
         {week.map((d, i) => {
           const isSelected = d.date === selectedDate
           const isToday    = d.date === today()
@@ -335,11 +337,11 @@ export function Dashboard() {
           return (
             <motion.button
               key={d.date}
-              initial={{ opacity: 0, y: 8 }}
+              initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.04, type: 'spring', stiffness: 400, damping: 30 }}
+              transition={{ delay: i * 0.03, duration: 0.25, ease: 'easeOut' }}
               onClick={() => setSelectedDate(d.date)}
-              className={`flex-1 flex flex-col items-center gap-1 py-2.5 px-1 rounded-2xl transition-all duration-200 ${
+              className={`flex-1 flex flex-col items-center gap-0.5 py-2 px-0.5 rounded-xl transition-colors duration-150 ${
                 isSelected
                   ? 'bg-accent/15 ring-1 ring-accent/30'
                   : 'bg-surface-200/40 hover:bg-surface-200/70'
@@ -355,10 +357,10 @@ export function Dashboard() {
               </span>
               {/* Mood dot */}
               <div
-                className="w-5 h-5 rounded-full flex items-center justify-center transition-all duration-300"
+                className="w-4 h-4 rounded-full flex items-center justify-center"
                 style={{
                   background: d.mood ? `${moodColor}25` : 'transparent',
-                  border: `2px solid ${d.mood ? moodColor : 'rgba(255,255,255,0.08)'}`,
+                  border: `1.5px solid ${d.mood ? moodColor : 'rgba(255,255,255,0.08)'}`,
                 }}
               >
                 {d.mood && (
@@ -383,7 +385,7 @@ export function Dashboard() {
 
       {/* ── Metric cards ── */}
       {visibleMetrics.length > 0 && (
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
           {visibleMetrics.map((id, i) => {
             const m = getMetricValue(id)
             if (!m) return null
@@ -392,21 +394,21 @@ export function Dashboard() {
               <motion.button
                 key={id}
                 onClick={() => setModalMetric({ id, ...m })}
-                initial={{ opacity: 0, scale: 0.93 }}
+                initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: i * 0.03, type: 'spring', stiffness: 400, damping: 30 }}
-                className="glass-card p-3.5 flex flex-col items-center gap-2.5 text-center hover:bg-surface-200/40 active:scale-[0.97] transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 cursor-pointer"
+                transition={{ delay: i * 0.025, duration: 0.2, ease: 'easeOut' }}
+                className="bg-surface-100/80 border border-white/[0.05] rounded-2xl p-3 flex flex-col items-center gap-2 text-center active:scale-[0.97] active:bg-surface-200/60 transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 cursor-pointer"
               >
                 {/* Icon */}
-                <div className={`w-10 h-10 rounded-2xl ${iconBg} border ${iconBorder} flex items-center justify-center`}>
-                  <Icon size={18} className={iconText} />
+                <div className={`w-9 h-9 rounded-xl ${iconBg} border ${iconBorder} flex items-center justify-center`}>
+                  <Icon size={16} className={iconText} />
                 </div>
                 {/* Value */}
                 <div className="flex flex-col items-center gap-0.5">
-                  <div className="text-[18px] font-black leading-none text-white/95 tabular-nums">
+                  <div className="text-base font-black leading-none text-white/95 tabular-nums">
                     {m.value}
                   </div>
-                  <div className="text-[9px] font-black text-white/28 uppercase tracking-[0.14em] leading-none">
+                  <div className="text-[8px] font-black text-white/28 uppercase tracking-[0.12em] leading-none">
                     {m.label}
                   </div>
                 </div>

@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useLiveQuery } from 'dexie-react-hooks'
 import {
   Plus, Pencil, Trash2, Dumbbell, X, Library, Search,
   BarChart3, Settings2, Activity, Bike, Footprints, Mountain,
@@ -15,7 +16,9 @@ import { useSectionPrefs } from '@/context/SectionPrefsContext'
 import { daysAgo, shortDate } from '@/utils/date'
 import type { Routine, RoutineExercise, ExerciseCatalog, EntryWorkout, DailyEntry } from '@/data/types'
 import type * as T from '@/data/types'
+import toast from 'react-hot-toast'
 import { WorkoutInsightsView } from './WorkoutInsightsView'
+import { RoutineEditor, WorkoutRunner } from './components'
 
 // ─── Activity type config ────────────────────────────────────────────────────
 const ACTIVITY_TYPES: { type: T.PhysicalActivityType; label: string; icon: any }[] = [
@@ -41,6 +44,30 @@ const MUSCLE_GROUPS = ['Pecho', 'Espalda', 'Hombro', 'Bíceps', 'Tríceps', 'Pie
 // tt tooltip removed – charts live in InsightsView now
 
 // ─── Main component ──────────────────────────────────────────────────────────
+const EMPTY_CAT_FORM: { name: string; muscleGroup: string; trackingMode: T.ExerciseTrackingMode; loadMode: T.ExerciseLoadMode } = {
+  name: '',
+  muscleGroup: '',
+  trackingMode: 'standard',
+  loadMode: 'total',
+}
+const TRACKING_OPTIONS = [
+  { value: 'standard', label: 'Bilateral' },
+  { value: 'unilateral', label: 'Unilateral' },
+]
+
+function buildWeekSets(allWorkouts: EntryWorkout[]) {
+  const w: { label: string; sets: number }[] = []
+  for (let i = 6; i >= 0; i--) {
+    const d = daysAgo(i)
+    const dw = allWorkouts.filter(x => x.entryDate === d && Array.isArray(x.exercises))
+    w.push({
+      label: shortDate(d),
+      sets: dw.reduce((s, x) => s + (x.exercises || []).reduce((s2, ex: any) => s2 + (Array.isArray(ex.sets) ? ex.sets.length : (ex.sets || 0)), 0), 0),
+    })
+  }
+  return w
+}
+
 export function WorkoutsPage() {
   // ── Data ──
   const [routines, setRoutines] = useState<Routine[]>([])
@@ -48,12 +75,10 @@ export function WorkoutsPage() {
   const [catalog, setCatalog] = useState<ExerciseCatalog[]>([])
   const [allWorkouts, setAllWorkouts] = useState<EntryWorkout[]>([])
   const [dailyEntries, setDailyEntries] = useState<DailyEntry[]>([])
-  const [weekSets, setWeekSets] = useState<{ label: string; sets: number }[]>([])
 
   // ── Modals / sheets ──
   const [routineFormOpen, setRoutineFormOpen] = useState(false)
   const [editingRoutine, setEditingRoutine] = useState<Routine | null>(null)
-  const [routineName, setRoutineName] = useState('')
   const [detailRoutine, setDetailRoutine] = useState<Routine | null>(null)
   const [detailTab, setDetailTab] = useState<'catalog' | 'custom'>('catalog')
   const [catalogOpen, setCatalogOpen] = useState(false)
@@ -61,17 +86,33 @@ export function WorkoutsPage() {
   const [sportsConfigOpen, setSportsConfigOpen] = useState(false)
   const [expandedSport, setExpandedSport] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<{ type: 'routine' | 'exercise'; id: number; name: string } | null>(null)
+  const [runnerRoutine, setRunnerRoutine] = useState<Routine | null>(null)
 
   // ── Catalog form ──
-  const [catForm, setCatForm] = useState({ name: '', muscleGroup: '' })
+  const [catForm, setCatForm] = useState<{
+    name: string
+    muscleGroup: string
+    trackingMode?: T.ExerciseTrackingMode
+    loadMode?: T.ExerciseLoadMode
+  }>(EMPTY_CAT_FORM)
   const [editCat, setEditCat] = useState<ExerciseCatalog | null>(null)
   const [catSearch, setCatSearch] = useState('')
   const [newExName, setNewExName] = useState('')
   const [detailCatSearch, setDetailCatSearch] = useState('')
 
   const { activeSports, toggleActiveSport, activityFields, toggleActivityField } = useSectionPrefs()
+  const liveWorkouts = useLiveQuery(() => db.entryWorkouts.toArray(), [])
+  const liveDailyEntries = useLiveQuery(() => db.dailyEntries.toArray(), [])
 
   useEffect(() => { load() }, [])
+
+  useEffect(() => {
+    if (liveWorkouts) setAllWorkouts(liveWorkouts)
+  }, [liveWorkouts])
+
+  useEffect(() => {
+    if (liveDailyEntries) setDailyEntries(liveDailyEntries)
+  }, [liveDailyEntries])
 
   async function load() {
     const [r, e, c, aw, de] = await Promise.all([
@@ -82,23 +123,116 @@ export function WorkoutsPage() {
       db.dailyEntries.toArray(),
     ])
     setRoutines(r); setExercises(e); setCatalog(c); setAllWorkouts(aw); setDailyEntries(de)
-    const w: { label: string; sets: number }[] = []
-    for (let i = 6; i >= 0; i--) {
-      const d = daysAgo(i)
-      const dw = aw.filter(x => x.entryDate === d)
-      w.push({
-        label: shortDate(d),
-        sets: dw.reduce((s, x) => s + x.exercises.reduce((s2, ex: any) => s2 + (Array.isArray(ex.sets) ? ex.sets.length : (ex.sets || 0)), 0), 0),
-      })
-    }
-    setWeekSets(w)
   }
 
   // ── CRUD ──
-  async function saveRoutine() {
-    if (editingRoutine) await db.routines.update(editingRoutine.id!, { name: routineName })
-    else await db.routines.add({ name: routineName })
-    setRoutineFormOpen(false); setRoutineName(''); setEditingRoutine(null); showSaved(); load()
+  async function saveRoutine(routine: Routine, routineExercises: RoutineExercise[]) {
+    try {
+      if (editingRoutine) {
+        // Update routine
+        await db.routines.update(editingRoutine.id!, {
+          name: routine.name,
+          objective: routine.objective,
+          estimatedDuration: routine.estimatedDuration,
+          timeOfDay: routine.timeOfDay,
+          notes: routine.notes,
+        })
+        // Update exercises order and params
+        for (const ex of routineExercises) {
+          if (ex.id) {
+            await db.routineExercises.update(ex.id, {
+              setsPlanned: ex.setsPlanned,
+              repsTarget: ex.repsTarget,
+              restBetweenSets: ex.restBetweenSets,
+              restAfterExercise: ex.restAfterExercise,
+              notes: ex.notes,
+              sortOrder: ex.sortOrder,
+            })
+          }
+        }
+      } else {
+        // Create new routine
+        const routineId = await db.routines.add({
+          name: routine.name,
+          objective: routine.objective,
+          estimatedDuration: routine.estimatedDuration,
+          timeOfDay: routine.timeOfDay,
+          notes: routine.notes,
+        }) as number
+        // Add exercises
+        for (const ex of routineExercises) {
+          await db.routineExercises.add({
+            routineId,
+            exerciseCatalogId: ex.exerciseCatalogId,
+            name: ex.name,
+            sortOrder: ex.sortOrder,
+            setsPlanned: ex.setsPlanned,
+            repsTarget: ex.repsTarget,
+            restBetweenSets: ex.restBetweenSets,
+            restAfterExercise: ex.restAfterExercise,
+            notes: ex.notes,
+          })
+        }
+      }
+      setRoutineFormOpen(false)
+      setEditingRoutine(null)
+      showSaved()
+      load()
+    } catch (error) {
+      console.error('Error saving routine:', error)
+      toast.error('Error al guardar la rutina')
+    }
+  }
+
+  async function updateRoutineExercise(exercise: RoutineExercise) {
+    try {
+      if (exercise.id) {
+        await db.routineExercises.update(exercise.id, {
+          setsPlanned: exercise.setsPlanned,
+          repsTarget: exercise.repsTarget,
+          restBetweenSets: exercise.restBetweenSets,
+          restAfterExercise: exercise.restAfterExercise,
+          notes: exercise.notes,
+        })
+        showSaved()
+        load()
+      }
+    } catch (error) {
+      console.error('Error updating exercise:', error)
+      toast.error('Error al actualizar el ejercicio')
+    }
+  }
+
+  async function addExerciseToRoutine(routineId: number, catalogId: number, customName?: string) {
+    try {
+      const mx = exercises.filter(e => e.routineId === routineId).length
+      const catalogEx = catalog.find(c => c.id === catalogId)
+      const name = customName || catalogEx?.name || 'Ejercicio'
+
+      // If custom name and not in catalog, create it first
+      let actualCatalogId = catalogId
+      if (customName && catalogId === 0) {
+        actualCatalogId = await db.exerciseCatalog.add({
+          name: customName,
+          muscleGroup: 'Otros',
+        }) as number
+      }
+
+      await db.routineExercises.add({
+        routineId,
+        exerciseCatalogId: actualCatalogId,
+        name,
+        sortOrder: mx,
+        setsPlanned: 3,
+        repsTarget: '8-12',
+        restBetweenSets: 90,
+      })
+      showSaved()
+      load()
+    } catch (error) {
+      console.error('Error adding exercise:', error)
+      toast.error('Error al agregar ejercicio')
+    }
   }
 
   async function delRoutine(id: number) {
@@ -109,7 +243,7 @@ export function WorkoutsPage() {
 
   async function addCatEx(rid: number, c: ExerciseCatalog) {
     const mx = exercises.filter(e => e.routineId === rid).length
-    await db.routineExercises.add({ routineId: rid, exerciseCatalogId: c.id!, name: c.name, sortOrder: mx })
+    await db.routineExercises.add({ routineId: rid, exerciseCatalogId: c.id!, name: c.name, sortOrder: mx, setsPlanned: 3, repsTarget: '8-12', restBetweenSets: 90 })
     showSaved(); load()
   }
 
@@ -120,7 +254,7 @@ export function WorkoutsPage() {
     if (c) cid = c.id!
     else cid = await db.exerciseCatalog.add({ name: newExName.trim(), muscleGroup: 'Otros' }) as number
     const mx = exercises.filter(e => e.routineId === rid).length
-    await db.routineExercises.add({ routineId: rid, exerciseCatalogId: cid, name: newExName.trim(), sortOrder: mx })
+    await db.routineExercises.add({ routineId: rid, exerciseCatalogId: cid, name: newExName.trim(), sortOrder: mx, setsPlanned: 3, repsTarget: '8-12', restBetweenSets: 90 })
     setNewExName(''); showSaved(); load()
   }
 
@@ -129,16 +263,34 @@ export function WorkoutsPage() {
   }
 
   async function saveCatEx() {
-    if (editCat) await db.exerciseCatalog.update(editCat.id!, catForm)
-    else await db.exerciseCatalog.add(catForm)
-    setCatForm({ name: '', muscleGroup: '' }); setEditCat(null); showSaved(); load()
+    const trackingMode = catForm.trackingMode || 'standard'
+    const loadMode = catForm.loadMode || (trackingMode === 'unilateral' ? 'per_side' : 'total')
+    const payload = { ...catForm, trackingMode, loadMode }
+    if (editCat) {
+      await db.exerciseCatalog.update(editCat.id!, payload)
+      if (editCat.name !== payload.name) {
+        const linkedExercises = await db.routineExercises.where('exerciseCatalogId').equals(editCat.id!).toArray()
+        await Promise.all(linkedExercises.map(ex => db.routineExercises.update(ex.id!, { name: payload.name })))
+      }
+    } else {
+      await db.exerciseCatalog.add(payload)
+    }
+    setCatForm(EMPTY_CAT_FORM); setEditCat(null); showSaved(); load()
   }
 
   async function delCatEx(id: number) {
+    const routinesUsing = await db.routineExercises.where('exerciseCatalogId').equals(id).count()
+    const usedInHistory = allWorkouts.some(w => w.exercises.some(ex => ex.exerciseCatalogId === id))
+    if (routinesUsing > 0 || usedInHistory) {
+      setConfirmDelete(null)
+      toast.error('Ese ejercicio ya se usa en rutinas o historial. Editalo o dejalo activo para conservar consistencia.')
+      return
+    }
     await db.exerciseCatalog.delete(id); setConfirmDelete(null); showSaved(); load()
   }
 
   // ── Derived data ──
+  const weekSets = useMemo(() => buildWeekSets(allWorkouts), [allWorkouts])
   const groups = useMemo(() => [...new Set(catalog.map(c => c.muscleGroup))].sort(), [catalog])
 
   const totalWeekSets = weekSets.reduce((s, d) => s + d.sets, 0)
@@ -195,17 +347,15 @@ export function WorkoutsPage() {
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            {(allWorkouts.length > 0 || weekSets.some(d => d.sets > 0)) && (
-              <button
-                onClick={() => setView(v => v === 'routines' ? 'insights' : 'routines')}
-                className={`btn-secondary text-xs flex items-center gap-1.5 ${view === 'insights' ? 'bg-accent/15 text-accent border-accent/30' : ''}`}
-              >
-                <BarChart3 size={13} />
-                <span className="hidden sm:inline">{view === 'insights' ? 'Rutinas' : 'Insights'}</span>
-              </button>
-            )}
             <button
-              onClick={() => { setEditingRoutine(null); setRoutineName(''); setRoutineFormOpen(true) }}
+              onClick={() => setView(v => v === 'routines' ? 'insights' : 'routines')}
+              className={`btn-secondary text-xs flex items-center gap-1.5 ${view === 'insights' ? 'bg-accent/15 text-accent border-accent/30' : ''}`}
+            >
+              <BarChart3 size={13} />
+              <span className="hidden sm:inline">{view === 'insights' ? 'Rutinas' : 'Insights'}</span>
+            </button>
+            <button
+              onClick={() => { setEditingRoutine(null); setRoutineFormOpen(true) }}
               className="btn-primary text-xs flex items-center gap-1.5"
             >
               <Plus size={14} /> <span className="hidden sm:inline">Nueva rutina</span><span className="sm:hidden">Rutina</span>
@@ -252,7 +402,7 @@ export function WorkoutsPage() {
                     <Dumbbell size={36} className="text-white/10 mx-auto mb-3" />
                     <p className="text-sm text-white/30">Sin rutinas todavía</p>
                     <p className="text-xs text-white/20 mt-1">Crea tu primera rutina para empezar</p>
-                    <button onClick={() => { setEditingRoutine(null); setRoutineName(''); setRoutineFormOpen(true) }} className="btn-primary text-xs mt-4">
+                    <button onClick={() => { setEditingRoutine(null); setRoutineFormOpen(true) }} className="btn-primary text-xs mt-4">
                       <Plus size={14} /> Crear rutina
                     </button>
                   </div>
@@ -267,9 +417,8 @@ export function WorkoutsPage() {
                           initial={{ opacity: 0, y: 8 }}
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ delay: i * 0.04 }}
-                          whileTap={{ scale: 0.98 }}
-                          onClick={() => { setDetailRoutine(r); setDetailTab('catalog'); setDetailCatSearch(''); setNewExName('') }}
-                          className="glass-card-hover p-3.5 cursor-pointer group"
+                          onClick={() => { setEditingRoutine(r); setRoutineFormOpen(true) }}
+                          className="glass-card-hover p-3.5 cursor-pointer group active:scale-[0.98] transition-transform"
                         >
                           <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-xl bg-orange-400/10 flex items-center justify-center shrink-0">
@@ -288,7 +437,15 @@ export function WorkoutsPage() {
                                 </p>
                               )}
                             </div>
-                            <ChevronRight size={16} className="text-white/15 shrink-0" />
+                            <div className="flex items-center gap-2 shrink-0">
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setRunnerRoutine(r) }}
+                                className="btn-secondary text-xs active:scale-95 transition-transform"
+                              >
+                                Iniciar
+                              </button>
+                              <ChevronRight size={16} className="text-white/15" />
+                            </div>
                           </div>
                         </motion.div>
                       )
@@ -300,14 +457,13 @@ export function WorkoutsPage() {
               {/* ── Config buttons ── */}
               <div className="flex items-center gap-2">
                 {navChips.map(chip => (
-                  <motion.button
+                  <button
                     key={chip.id}
-                    whileTap={{ scale: 0.95 }}
                     onClick={chip.action}
-                    className="btn-secondary text-xs flex items-center gap-1.5 shrink-0"
+                    className="btn-secondary text-xs flex items-center gap-1.5 shrink-0 active:scale-95 transition-transform"
                   >
                     <chip.icon size={13} /> {chip.label}
-                  </motion.button>
+                  </button>
                 ))}
               </div>
             </>
@@ -330,13 +486,13 @@ export function WorkoutsPage() {
             {/* Actions */}
             <div className="flex gap-2">
               <button
-                onClick={() => { setDetailRoutine(null); setEditingRoutine(detailRoutine); setRoutineName(detailRoutine.name); setRoutineFormOpen(true) }}
+                onClick={() => { setDetailRoutine(null); setEditingRoutine(detailRoutine); setRoutineFormOpen(true) }}
                 className="btn-secondary text-xs flex-1"
               >
                 <Pencil size={13} /> Editar nombre
               </button>
               <button
-                onClick={() => setConfirmDelete({ type: 'routine', id: detailRoutine.id!, name: detailRoutine.name })}
+                onClick={() => { setConfirmDelete({ type: 'routine', id: detailRoutine.id!, name: detailRoutine.name }) }}
                 className="btn-ghost text-xs text-red-400/50 hover:text-red-400"
               >
                 <Trash2 size={13} />
@@ -377,7 +533,7 @@ export function WorkoutsPage() {
                   <button
                     key={tab}
                     onClick={() => setDetailTab(tab)}
-                    className={`flex-1 py-2.5 rounded-[10px] text-xs font-semibold transition-all ${detailTab === tab ? 'bg-accent/15 text-accent' : 'text-white/30 hover:text-white/50'
+                    className={`flex-1 py-2.5 rounded-[10px] text-xs font-semibold transition-colors ${detailTab === tab ? 'bg-accent/15 text-accent' : 'text-white/30 hover:text-white/50'
                       }`}
                   >
                     {tab === 'catalog' ? 'Catálogo' : 'Personalizado'}
@@ -469,15 +625,22 @@ export function WorkoutsPage() {
         )}
       </Modal>
 
-      {/* ── Routine name form ── */}
-      <Modal open={routineFormOpen} onClose={() => setRoutineFormOpen(false)} title={editingRoutine ? 'Editar rutina' : 'Nueva rutina'} size="sm">
-        <div className="space-y-4">
-          <input value={routineName} onChange={e => setRoutineName(e.target.value)} className="input-field" placeholder="Nombre de la rutina" />
-          <button onClick={saveRoutine} disabled={!routineName} className="btn-primary w-full disabled:opacity-40">
-            {editingRoutine ? 'Guardar cambios' : 'Crear rutina'}
-          </button>
-        </div>
-      </Modal>
+      {/* ── Routine Editor ── */}
+      <RoutineEditor
+        open={routineFormOpen}
+        onClose={() => setRoutineFormOpen(false)}
+        routine={editingRoutine}
+        exercises={exercises}
+        catalog={catalog}
+        onSave={saveRoutine}
+        onAddExercise={addExerciseToRoutine}
+        onDeleteExercise={delExFromRoutine}
+        onUpdateExercise={updateRoutineExercise}
+        onDeleteRoutine={(id) => {
+          delRoutine(id)
+          setRoutineFormOpen(false)
+        }}
+      />
 
       {/* ── Sports config sheet ── */}
       <Modal open={sportsConfigOpen} onClose={() => setSportsConfigOpen(false)} title="Deportes activos" size="md">
@@ -487,7 +650,7 @@ export function WorkoutsPage() {
             const isActive = activeSports.includes(act.type)
             const isExpanded = expandedSport === act.type
             return (
-              <div key={act.type} className={`rounded-xl border transition-all ${isActive ? 'bg-surface-200/50 border-orange-400/20' : 'bg-surface-100/50 border-white/[0.04] opacity-60'}`}>
+              <div key={act.type} className={`rounded-xl border transition-colors ${isActive ? 'bg-surface-200/50 border-orange-400/20' : 'bg-surface-100/50 border-white/[0.04] opacity-60'}`}>
                 <div className="flex items-center gap-3 p-3">
                   <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${isActive ? 'bg-orange-400/15 text-orange-400' : 'bg-surface-300 text-white/30'}`}>
                     <act.icon size={17} />
@@ -505,7 +668,7 @@ export function WorkoutsPage() {
                   {/* Toggle */}
                   <label className="relative inline-flex items-center cursor-pointer shrink-0">
                     <input type="checkbox" className="sr-only peer" checked={isActive} onChange={() => toggleActiveSport(act.type)} />
-                    <div className="w-9 h-5 bg-surface-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-orange-400" />
+                    <div className="w-9 h-5 bg-surface-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-transform peer-checked:bg-orange-400" />
                   </label>
                 </div>
 
@@ -529,7 +692,7 @@ export function WorkoutsPage() {
                             return (
                               <label
                                 key={f}
-                                className={`flex items-center gap-1 text-[11px] font-medium cursor-pointer select-none px-2 py-1 rounded-lg border transition-all ${isDerived
+                                className={`flex items-center gap-1 text-[11px] font-medium cursor-pointer select-none px-2 py-1 rounded-lg border transition-colors ${isDerived
                                     ? 'bg-surface-300/20 border-white/[0.04] text-white/25 cursor-default'
                                     : isSelected
                                       ? 'bg-orange-400/10 border-orange-400/25 text-orange-400'
@@ -564,80 +727,126 @@ export function WorkoutsPage() {
       </Modal>
 
       {/* ── Catalog modal ── */}
-      <Modal open={catalogOpen} onClose={() => { setCatalogOpen(false); setEditCat(null); setCatForm({ name: '', muscleGroup: '' }); setCatSearch('') }} title="Catálogo de ejercicios" size="lg">
-        {/* Add/edit form */}
-        <div className="mb-4">
-          {editCat && (
-            <p className="text-[10px] text-accent uppercase tracking-wider mb-2 font-semibold">Editando: {editCat.name}</p>
-          )}
-          <div className="flex flex-col sm:flex-row gap-2">
-            <input
-              value={catForm.name}
-              onChange={e => setCatForm(f => ({ ...f, name: e.target.value }))}
-              className="input-field text-sm flex-1"
-              placeholder="Nombre del ejercicio"
-            />
-            <div className="flex gap-2">
-              <SheetSelect
-                value={catForm.muscleGroup}
-                onChange={v => setCatForm(f => ({ ...f, muscleGroup: v }))}
-                className="flex-1 sm:w-36"
-                placeholder="Grupo muscular"
-                options={MUSCLE_GROUPS.map(g => ({ value: g, label: g }))}
-              />
-              <button
-                onClick={saveCatEx}
-                disabled={!catForm.name || !catForm.muscleGroup}
-                className="btn-primary px-4 shrink-0 disabled:opacity-40"
-              >
-                {editCat ? '✓' : <Plus size={16} />}
-              </button>
-            </div>
-          </div>
-        </div>
-
+      <Modal open={catalogOpen} onClose={() => { setCatalogOpen(false); setEditCat(null); setCatForm({ name: '', muscleGroup: '' }); setCatSearch('') }} title="Catálogo de Ejercicios" size="md">
+        
         {/* Search */}
-        <div className="relative mb-3">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/20" />
+        <div className="relative mb-5">
+          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none" />
           <input
             value={catSearch}
             onChange={e => setCatSearch(e.target.value)}
-            className="input-field text-xs py-2 pl-9"
-            placeholder="Buscar en catálogo..."
+            className="input-field w-full h-12 pl-10 pr-4 bg-surface-200/50 border border-white/5 focus:border-accent/50 focus:bg-surface-200/80 rounded-xl transition-all outline-none font-medium text-white/90 shadow-inner"
+            placeholder="Buscar ejercicio ej. Press banca..."
           />
         </div>
 
         {/* Grouped list */}
-        <div className="max-h-[50vh] overflow-y-auto pr-1 space-y-3">
-          {catalogGroups.map(g => (
-            <div key={g}>
-              <p className="text-[9px] uppercase tracking-widest text-white/20 mb-1.5 font-semibold sticky top-0 bg-surface-100 py-1 z-10">{g}</p>
-              <div className="space-y-1">
-                {catalogFiltered.filter(c => c.muscleGroup === g).map(c => (
-                  <div key={c.id} className="flex items-center justify-between px-3 py-2.5 bg-surface-200/40 rounded-xl">
-                    <span className="text-sm truncate mr-2">{c.name}</span>
-                    <div className="flex gap-0.5 shrink-0">
-                      <button
-                        onClick={() => { setEditCat(c); setCatForm({ name: c.name, muscleGroup: c.muscleGroup }) }}
-                        className="p-1.5 rounded-lg text-white/25 hover:text-white hover:bg-surface-300/50 transition-colors"
-                      >
-                        <Pencil size={12} />
-                      </button>
-                      <button
-                        onClick={() => setConfirmDelete({ type: 'exercise', id: c.id!, name: c.name })}
-                        className="p-1.5 rounded-lg text-red-400/25 hover:text-red-400 hover:bg-red-400/10 transition-colors"
-                      >
-                        <Trash2 size={12} />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
+        <div className="max-h-[35vh] overflow-y-auto pr-1 space-y-4 mb-5 hide-scrollbar">
+          {catalogGroups.length === 0 ? (
+            <div className="text-center py-8">
+              <Library size={24} className="text-white/10 mx-auto mb-2" />
+              <p className="text-xs text-white/25">Sin ejercicios encontrados</p>
             </div>
-          ))}
-          {catalogGroups.length === 0 && (
-            <p className="text-xs text-white/20 text-center py-8">Sin ejercicios en el catálogo</p>
+          ) : (
+            catalogGroups.map(g => (
+              <div key={g}>
+                <div className="sticky top-0 z-10 py-1.5 bg-surface-100/95 backdrop-blur-md">
+                  <span className="text-[10px] font-bold text-white/30 uppercase tracking-widest pl-1">{g}</span>
+                </div>
+                <div className="space-y-1.5 mt-1">
+                  {catalogFiltered.filter(c => c.muscleGroup === g).map(c => (
+                    <div key={c.id} className="flex items-center justify-between px-3 py-3 bg-surface-200/40 rounded-xl border border-white/[0.03] hover:bg-surface-300/30 transition-colors group">
+                      <span className="text-sm font-semibold truncate flex-1 pr-2">{c.name}</span>
+                      
+                      <div className="flex gap-1.5 shrink-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={() => { setEditCat(c); setCatForm({ name: c.name, muscleGroup: c.muscleGroup, trackingMode: c.trackingMode || 'standard', loadMode: c.loadMode || 'total' }) }}
+                          className="w-8 h-8 flex items-center justify-center rounded-lg bg-surface-300/40 hover:bg-surface-300/80 active:bg-accent/20 text-white/50 hover:text-white transition-colors"
+                        >
+                          <Pencil size={14} />
+                        </button>
+                        <button
+                          onClick={() => setConfirmDelete({ type: 'exercise', id: c.id!, name: c.name })}
+                          className="w-8 h-8 flex items-center justify-center rounded-lg bg-red-500/10 hover:bg-red-500/20 active:bg-red-500/30 text-red-400 hover:text-red-300 transition-colors"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))
           )}
+        </div>
+
+        {/* Add/edit form fixed at bottom */}
+        <div className="bg-surface-200/30 border border-white/[0.04] rounded-2xl p-4">
+          {editCat ? (
+            <div className="flex items-center justify-between mb-3">
+               <p className="text-[10px] text-accent uppercase tracking-wider font-bold flex items-center gap-1.5">
+                 <Pencil size={12}/> Editando: {editCat.name}
+               </p>
+               <button onClick={() => { setEditCat(null); setCatForm({ name: '', muscleGroup: '' }) }} className="text-[10px] text-white/30 hover:text-white font-medium">Cancelar</button>
+            </div>
+          ) : (
+            <p className="text-[10px] text-white/30 uppercase tracking-widest font-bold mb-3 pl-1 flex items-center gap-1.5">
+              <Plus size={12}/> Crear Ejercicio
+            </p>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+            <div>
+              <input
+                value={catForm.name}
+                onChange={e => setCatForm(f => ({ ...f, name: e.target.value }))}
+                className="input-field w-full h-11 px-3 bg-surface-200/50 border border-white/5 focus:border-accent/50 focus:bg-surface-200/80 rounded-xl transition-all outline-none font-medium text-sm shadow-inner"
+                placeholder="Nombre del Ejercicio"
+              />
+            </div>
+            <div className="[&>select]:h-11 [&>select]:bg-surface-200/50">
+              <SheetSelect
+                value={catForm.muscleGroup}
+                onChange={v => setCatForm(f => ({ ...f, muscleGroup: v }))}
+                className="w-full text-sm h-11"
+                placeholder="Grupo muscular"
+                options={MUSCLE_GROUPS.map(g => ({ value: g, label: g }))}
+              />
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-3">
+            <div className="flex-1 grid grid-cols-2 gap-3 [&>select]:h-11 [&>select]:bg-surface-200/50">
+              <SheetSelect
+                value={catForm.trackingMode || 'standard'}
+                onChange={v => setCatForm(f => ({
+                  ...f,
+                  trackingMode: (v as T.ExerciseTrackingMode) || 'standard',
+                  loadMode: (v as T.ExerciseTrackingMode) === 'unilateral' ? 'per_side' : 'total',
+                }))}
+                className="w-full text-sm h-11"
+                placeholder="Registro"
+                options={TRACKING_OPTIONS}
+              />
+              <SheetSelect
+                value={catForm.loadMode || (catForm.trackingMode === 'unilateral' ? 'per_side' : 'total')}
+                onChange={v => setCatForm(f => ({ ...f, loadMode: (v as T.ExerciseLoadMode) || 'total' }))}
+                className="w-full text-sm h-11"
+                placeholder="Carga"
+                options={(catForm.trackingMode === 'unilateral'
+                  ? [{ value: 'per_side', label: 'Peso un lado' }]
+                  : [{ value: 'total', label: 'Peso total' }, { value: 'per_hand', label: 'Por mano' }])}
+              />
+            </div>
+
+            <button
+              onClick={saveCatEx}
+              disabled={!catForm.name || !catForm.muscleGroup}
+              className="w-11 h-11 flex shrink-0 items-center justify-center rounded-xl bg-accent text-back-100 disabled:opacity-50 disabled:bg-surface-300 disabled:text-white/20 active:scale-95 transition-all shadow-[0_0_15px_rgba(255,165,0,0.15)] disabled:shadow-none"
+            >
+              {editCat ? <Pencil size={18} /> : <Plus size={20} />}
+            </button>
+          </div>
         </div>
       </Modal>
 
@@ -661,6 +870,23 @@ export function WorkoutsPage() {
           </div>
         )}
       </Modal>
+
+      {/* ── Workout Runner ── */}
+      {runnerRoutine && (
+        <WorkoutRunner
+          open={!!runnerRoutine}
+          onClose={() => setRunnerRoutine(null)}
+          routine={runnerRoutine}
+          routineExercises={exercises.filter(e => e.routineId === runnerRoutine.id).sort((a, b) => a.sortOrder - b.sortOrder)}
+          entryDate={new Date().toISOString().split('T')[0]}
+          allWorkouts={allWorkouts}
+          onComplete={() => {
+            setRunnerRoutine(null)
+            load()
+            showSaved()
+          }}
+        />
+      )}
     </div>
   )
 }

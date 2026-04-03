@@ -67,14 +67,12 @@ export function MoodSection({ entry, isHorizontal, onUpdate }: Props) {
               transition={{ type: 'spring', stiffness: 300, damping: 20 }}
               className="flex flex-col items-center gap-3"
             >
-              <motion.div
+              <div
                 className={`relative flex items-center justify-center w-28 h-28 rounded-full ${selected.glow}`}
                 style={{ background: `radial-gradient(circle, ${selected.color} 0%, transparent 70%)` }}
-                animate={{ scale: [1, 1.04, 1] }}
-                transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
               >
                 <span className="text-7xl filter drop-shadow-xl select-none">{selected.emoji}</span>
-              </motion.div>
+              </div>
               <motion.p
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -91,13 +89,9 @@ export function MoodSection({ entry, isHorizontal, onUpdate }: Props) {
               exit={{ opacity: 0 }}
               className="flex flex-col items-center gap-3"
             >
-              <motion.div
-                animate={{ scale: [1, 1.06, 1], opacity: [0.3, 0.5, 0.3] }}
-                transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
-                className="w-20 h-20 rounded-full bg-white/5 border border-white/10 flex items-center justify-center"
-              >
+              <div className="w-20 h-20 rounded-full bg-white/5 border border-white/10 flex items-center justify-center opacity-40">
                 <Smile size={36} className="text-white/20" />
-              </motion.div>
+              </div>
               <p className="text-sm font-bold text-white/25">¿Cómo fue tu día?</p>
             </motion.div>
           )}
@@ -108,27 +102,26 @@ export function MoodSection({ entry, isHorizontal, onUpdate }: Props) {
           {MOODS.map(m => {
             const isActive = entry.mood === m.value
             return (
-              <motion.button
+              <button
                 key={m.value}
-                whileTap={{ scale: 0.85 }}
                 onClick={() => onUpdate({ mood: isActive ? undefined : m.value })}
-                className={`relative flex items-center justify-center w-12 h-12 rounded-full transition-all duration-200 ${
+                className={`relative flex items-center justify-center w-12 h-12 rounded-full transition-colors duration-200 active:scale-90 ${
                   isActive
                     ? `bg-white/10 ring-2 ${m.ring} shadow-lg`
-                    : 'bg-white/[0.04] hover:bg-white/8'
+                    : 'bg-white/[0.04]'
                 }`}
               >
-                <span className={`text-2xl transition-all duration-200 ${isActive ? 'scale-110' : 'opacity-50'}`}>
+                <span className={`text-2xl transition-opacity duration-200 ${isActive ? 'scale-110' : 'opacity-50'}`}>
                   {m.emoji}
                 </span>
-              </motion.button>
+              </button>
             )
           })}
         </div>
       </div>
 
       {/* Inline note — extra bottom gap to clear the floating dock */}
-      <div className="shrink-0 px-2 sm:px-6 mt-2 mb-14">
+      <div className="shrink-0 px-2 sm:px-6 mt-2">
         <div className="flex items-start gap-2.5 bg-surface-200/30 rounded-2xl px-4 py-3 border border-white/[0.05]">
           <PenLine size={14} className="text-white/25 mt-0.5 shrink-0" />
           <textarea

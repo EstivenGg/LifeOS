@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion'
+
 import { Brain, Minus, Plus } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import { ModeToggle } from '@/components/ui/ModeToggle'
@@ -59,11 +59,9 @@ export function MeditationSection({ entry, isAdv, isHorizontal, meditationDone, 
             <div className="relative w-44 h-44 flex items-center justify-center">
               <div className="absolute inset-0 rounded-full border-2 border-violet-400/10" />
               <div className="absolute inset-2 rounded-full border border-violet-400/5" />
-              <motion.div
+              <div
                 className="absolute inset-0 rounded-full"
                 style={{ background: 'radial-gradient(circle, rgba(167,139,250,0.1) 0%, transparent 70%)' }}
-                animate={{ scale: [1, 1.06, 1] }}
-                transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
               />
               <div className="relative z-10 flex flex-col items-center">
                 <input
@@ -84,7 +82,7 @@ export function MeditationSection({ entry, isAdv, isHorizontal, meditationDone, 
               <button
                 type="button"
                 onClick={() => setMins(Math.max(0, mins - 1))}
-                className="w-11 h-11 rounded-2xl bg-violet-400/10 border border-violet-400/20 flex items-center justify-center text-violet-400/60 hover:bg-violet-400/20 hover:text-violet-400 active:scale-95 transition-all"
+                className="w-11 h-11 rounded-2xl bg-violet-400/10 border border-violet-400/20 flex items-center justify-center text-violet-400/60 hover:bg-violet-400/20 hover:text-violet-400 active:scale-95 transition-colors"
               >
                 <Minus size={16} />
               </button>
@@ -92,25 +90,24 @@ export function MeditationSection({ entry, isAdv, isHorizontal, meditationDone, 
               {/* Preset chips */}
               <div className="flex gap-1.5">
                 {PRESETS.map(p => (
-                  <motion.button
+                  <button
                     key={p}
-                    whileTap={{ scale: 0.9 }}
                     onClick={() => setMins(p)}
-                    className={`w-10 h-10 rounded-xl text-xs font-black transition-all border ${
+                    className={`w-10 h-10 rounded-xl text-xs font-black transition-colors border active:scale-90 ${
                       mins === p
                         ? 'bg-violet-400/25 border-violet-400/40 text-violet-300'
                         : 'bg-surface-200/40 border-white/5 text-white/35 hover:border-violet-400/20 hover:text-violet-400/70'
                     }`}
                   >
                     {p}
-                  </motion.button>
+                  </button>
                 ))}
               </div>
 
               <button
                 type="button"
                 onClick={() => setMins(mins + 1)}
-                className="w-11 h-11 rounded-2xl bg-violet-400/10 border border-violet-400/20 flex items-center justify-center text-violet-400/60 hover:bg-violet-400/20 hover:text-violet-400 active:scale-95 transition-all"
+                className="w-11 h-11 rounded-2xl bg-violet-400/10 border border-violet-400/20 flex items-center justify-center text-violet-400/60 hover:bg-violet-400/20 hover:text-violet-400 active:scale-95 transition-colors"
               >
                 <Plus size={16} />
               </button>

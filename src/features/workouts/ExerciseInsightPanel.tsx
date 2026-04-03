@@ -11,6 +11,8 @@ import {
 } from 'lucide-react'
 import type { EntryWorkout, ExerciseCatalog, DailyEntry } from '@/data/types'
 import { parseDate } from '@/utils/date'
+import { estimateWorkoutSet1RM, getSetDisplayWeight, getSetTotalReps, getSetVolume } from '@/utils/workoutMetrics'
+import { useWeightUnit } from '@/context/SectionPrefsContext'
 
 // ── 1RM (Epley): w * (1 + r/30)
 function estimate1RM(weight: number, reps: number): number {
@@ -56,17 +58,18 @@ function buildSessionData(allWorkouts: EntryWorkout[], exerciseName: string): Se
     exInstances.forEach(ex => {
       ex.sets?.forEach(s => {
         totalSets++
-        totalReps += s.reps || 0
-        const w = s.weight ?? 0
-        const r = s.reps ?? 0
-        if (w > 0) {
-          totalVolume += r * w
-          if (w > maxWeight) maxWeight = w
-          const rm = estimate1RM(w, r)
+        const reps = getSetTotalReps(s, ex)
+        totalReps += reps
+        const weight = getSetDisplayWeight(s, ex)
+        const volume = getSetVolume(s, ex)
+        const rm = estimateWorkoutSet1RM(s, ex)
+        if (volume > 0) totalVolume += volume
+        if (weight > maxWeight) maxWeight = weight
+        if (weight > 0) {
           if (rm > best1RM) best1RM = rm
-          sets.push({ reps: r, weight: w, rpe: s.rpe, est1RM: rm })
-        } else if (r > 0) {
-          sets.push({ reps: r, weight: 0, rpe: s.rpe, est1RM: 0 })
+          sets.push({ reps, weight, rpe: s.rpe, est1RM: rm })
+        } else if (reps > 0) {
+          sets.push({ reps, weight: 0, rpe: s.rpe, est1RM: 0 })
         }
       })
     })
@@ -108,16 +111,17 @@ function linearRegression(points: { x: number; y: number }[]): { slope: number; 
 function round1(n: number) { return Math.round(n * 10) / 10 }
 
 // ── Custom Tooltip – session chart
-function SessionTooltip({ active, payload }: TooltipProps<number, string>) {
+function SessionTooltip({ active, payload, weightUnit }: TooltipProps<number, string> & { weightUnit?: string }) {
   if (!active || !payload?.length) return null
   const d = payload[0].payload as SessionData & { label: string }
+  const u = weightUnit ?? 'kg'
   return (
     <div className="bg-[#1c1c26] border border-white/[0.08] rounded-xl px-4 py-3 shadow-xl min-w-[160px]">
       <p className="text-[10px] font-bold uppercase tracking-widest text-white/40 mb-2">{d.dateFull ?? d.dateLabel}</p>
       {d.sets.filter(s => s.weight > 0).map((s, i) => (
         <div key={i} className="flex items-center gap-2 text-xs mb-1">
           <span className="text-white/30 w-4 text-right">{i + 1}.</span>
-          <span className="font-bold text-white/90">{s.weight} kg</span>
+          <span className="font-bold text-white/90">{s.weight} {u}</span>
           <span className="text-white/40">× {s.reps} reps</span>
           {s.rpe && <span className="text-purple-400/70 text-[10px]">RPE {s.rpe}</span>}
         </div>
@@ -125,7 +129,7 @@ function SessionTooltip({ active, payload }: TooltipProps<number, string>) {
       {d.maxWeight > 0 && (
         <div className="border-t border-white/[0.05] mt-2 pt-2 flex items-center justify-between gap-4">
           <span className="text-[10px] text-white/30">Máx</span>
-          <span className="text-xs font-bold text-orange-400">{d.maxWeight} kg</span>
+          <span className="text-xs font-bold text-orange-400">{d.maxWeight} {u}</span>
         </div>
       )}
     </div>
@@ -240,6 +244,7 @@ function buildNarrativeText(
 }
 
 export function ExerciseInsightPanel({ allWorkouts, dailyEntries }: Props) {
+  const { unit, kgToDisplay } = useWeightUnit()
   const [search, setSearch] = useState('')
   const [selectedEx, setSelectedEx] = useState<string | null>(null)
   const [graph, setGraph] = useState<ExGraph>('weight')
@@ -308,8 +313,20 @@ export function ExerciseInsightPanel({ allWorkouts, dailyEntries }: Props) {
   // Graph uses filteredSessions
   const graphKey = graph === 'weight' ? 'maxWeight' : graph === 'volume' ? 'totalVolume' : 'best1RM'
   const graphColor = graph === 'volume' ? '#a855f7' : graph === '1rm' ? '#22d3ee' : '#f97316'
-  const graphUnit = graph === 'volume' ? 'kg vol' : 'kg'
+  const graphUnit = graph === 'volume' ? `${unit} vol` : unit
   const graphLabel = graph === 'weight' ? 'Peso máx' : graph === 'volume' ? 'Volumen' : '1RM est.'
+
+  // Display-converted sessions for chart
+  const displayFilteredSessions = useMemo(() =>
+    filteredSessions.map(s => ({
+      ...s,
+      maxWeight: kgToDisplay(s.maxWeight),
+      totalVolume: Math.round(kgToDisplay(s.totalVolume) * 10) / 10,
+      best1RM: kgToDisplay(s.best1RM),
+      sets: s.sets.map(set => ({ ...set, weight: kgToDisplay(set.weight), est1RM: kgToDisplay(set.est1RM) })),
+    })),
+    [filteredSessions, kgToDisplay]
+  )
 
   // ── Body-weight cross data: sessions that have a matched weight entry (±1 day tolerance)
   const crossData = useMemo(() => {
@@ -436,7 +453,7 @@ export function ExerciseInsightPanel({ allWorkouts, dailyEntries }: Props) {
             <button
               key={r.key}
               onClick={() => setDateRange(r.key)}
-              className={`px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider rounded-lg transition-all ${
+              className={`px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider rounded-lg transition-colors ${
                 dateRange === r.key
                   ? 'bg-accent/20 text-accent'
                   : 'text-white/30 hover:text-white/60'
@@ -484,10 +501,10 @@ export function ExerciseInsightPanel({ allWorkouts, dailyEntries }: Props) {
             {/* KPIs */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {[
-                { label: 'Peso máximo', value: summary.maxWeight > 0 ? `${summary.maxWeight} kg` : '—', icon: <Trophy size={15} className="text-amber-400" />, bg: 'bg-amber-500/10' },
-                { label: '1RM estimado', value: summary.best1RM > 0 ? `${summary.best1RM} kg` : '—', icon: <Zap size={15} className="text-cyan-400" />, bg: 'bg-cyan-500/10' },
-                { label: 'Mejor sesión', value: summary.maxVolume > 0 ? `${summary.maxVolume} kg vol` : '—', icon: <BarChart3 size={15} className="text-purple-400" />, bg: 'bg-purple-500/10' },
-                { label: 'Volumen total', value: summary.totalVolume > 1000 ? `${(summary.totalVolume / 1000).toFixed(1)}k kg` : `${summary.totalVolume} kg`, icon: <TrendingUp size={15} className="text-emerald-400" />, bg: 'bg-emerald-500/10' },
+                { label: 'Peso máximo', value: summary.maxWeight > 0 ? `${kgToDisplay(summary.maxWeight)} ${unit}` : '—', icon: <Trophy size={15} className="text-amber-400" />, bg: 'bg-amber-500/10' },
+                { label: '1RM estimado', value: summary.best1RM > 0 ? `${kgToDisplay(summary.best1RM)} ${unit}` : '—', icon: <Zap size={15} className="text-cyan-400" />, bg: 'bg-cyan-500/10' },
+                { label: 'Mejor sesión', value: summary.maxVolume > 0 ? `${kgToDisplay(summary.maxVolume)} ${unit} vol` : '—', icon: <BarChart3 size={15} className="text-purple-400" />, bg: 'bg-purple-500/10' },
+                { label: 'Volumen total', value: kgToDisplay(summary.totalVolume) > 1000 ? `${(kgToDisplay(summary.totalVolume) / 1000).toFixed(1)}k ${unit}` : `${kgToDisplay(summary.totalVolume)} ${unit}`, icon: <TrendingUp size={15} className="text-emerald-400" />, bg: 'bg-emerald-500/10' },
                 { label: 'Media reps/serie', value: summary.avgReps > 0 ? `${summary.avgReps}` : '—', icon: <Dumbbell size={15} className="text-blue-400" />, bg: 'bg-blue-500/10' },
                 { label: 'Últ. entrenado', value: summary.lastDone ? parseDate(summary.lastDone).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' }) : '—', icon: <CalendarDays size={15} className="text-rose-400" />, bg: 'bg-rose-500/10' },
               ].map((kpi, i) => (
@@ -510,7 +527,7 @@ export function ExerciseInsightPanel({ allWorkouts, dailyEntries }: Props) {
               }`}>
                 <TrendingUp size={14} className="shrink-0" />
                 <span>Volumen últ. 4 semanas: <strong>{summary.volumeChange > 0 ? '+' : ''}{summary.volumeChange}%</strong></span>
-                <span className="text-[11px] font-normal opacity-60 ml-1">({summary.prev4Vol} → {summary.recent4Vol} kg)</span>
+                <span className="text-[11px] font-normal opacity-60 ml-1">({kgToDisplay(summary.prev4Vol)} → {kgToDisplay(summary.recent4Vol)} {unit})</span>
               </div>
             )}
 
@@ -538,7 +555,7 @@ export function ExerciseInsightPanel({ allWorkouts, dailyEntries }: Props) {
 
               {sessions.filter(s => (s as any)[graphKey] > 0).length >= 2 ? (
                 <ResponsiveContainer width="100%" height={220}>
-                  <LineChart data={filteredSessions} margin={{ top: 5, right: 10, bottom: 5, left: 0 }}>
+                  <LineChart data={displayFilteredSessions} margin={{ top: 5, right: 10, bottom: 5, left: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.04)" vertical={false} />
                     <XAxis
                       dataKey="dateLabel"
@@ -551,7 +568,7 @@ export function ExerciseInsightPanel({ allWorkouts, dailyEntries }: Props) {
                       width={36} axisLine={false} tickLine={false}
                       tickFormatter={(v: number) => graph === 'volume' && v > 999 ? `${(v/1000).toFixed(1)}k` : `${v}`}
                     />
-                    <Tooltip content={<SessionTooltip />} />
+                    <Tooltip content={<SessionTooltip weightUnit={unit} />} />
                     <Line
                       type="monotone"
                       dataKey={graphKey}
@@ -559,7 +576,7 @@ export function ExerciseInsightPanel({ allWorkouts, dailyEntries }: Props) {
                       strokeWidth={2.5}
                       name={graphLabel}
                       dot={(props: any) => {
-                        const maxVal = Math.max(...filteredSessions.map((s: any) => s[graphKey]))
+                        const maxVal = Math.max(...displayFilteredSessions.map((s: any) => s[graphKey]))
                         const isMax = props.payload[graphKey] === maxVal
                         return (
                           <circle
@@ -771,7 +788,7 @@ export function ExerciseInsightPanel({ allWorkouts, dailyEntries }: Props) {
                   return (
                     <div
                       key={s.date}
-                      className={`rounded-xl overflow-hidden border transition-all ${isMaxWeight || isMaxVol ? 'border-amber-400/20 bg-amber-400/5' : 'border-white/[0.04] bg-surface-200/30'}`}
+                      className={`rounded-xl overflow-hidden border transition-colors ${isMaxWeight || isMaxVol ? 'border-amber-400/20 bg-amber-400/5' : 'border-white/[0.04] bg-surface-200/30'}`}
                     >
                       {/* Row header — always visible */}
                       <button

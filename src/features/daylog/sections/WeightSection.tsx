@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
-import { motion } from 'framer-motion'
+
 import { Scale, Minus, Plus } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
+import { useWeightUnit } from '@/context/SectionPrefsContext'
 import type * as T from '@/data/types'
 
 interface Props {
@@ -12,25 +13,29 @@ interface Props {
 }
 
 export function WeightSection({ entry, isHorizontal, onUpdate, lastWeight }: Props) {
-  const [inputValue, setInputValue] = useState(entry.weightKg?.toString() ?? '')
+  const { unit, kgToDisplay, displayToKg, inputStepBody } = useWeightUnit()
+  const [inputValue, setInputValue] = useState(entry.weightKg != null ? kgToDisplay(entry.weightKg).toString() : '')
   const [editing, setEditing] = useState(false)
 
   // Sync from parent when not actively editing
   useEffect(() => {
     if (!editing) {
-      setInputValue(entry.weightKg?.toString() ?? '')
+      setInputValue(entry.weightKg != null ? kgToDisplay(entry.weightKg).toString() : '')
     }
-  }, [entry.weightKg, editing])
+  }, [entry.weightKg, editing, unit])
 
   const hasValue = entry.weightKg !== undefined || editing
-  const placeholderValue = !entry.weightKg && !editing && lastWeight ? `${lastWeight}` : '—'
+  const placeholderValue = !entry.weightKg && !editing && lastWeight ? `${kgToDisplay(lastWeight)}` : '—'
 
   function handleChange(raw: string) {
     setInputValue(raw)
     if (raw === '') return // allow clearing without losing the input
     const v = parseFloat(raw)
-    if (!isNaN(v) && v >= 20 && v <= 300) {
-      onUpdate({ weightKg: v })
+    if (!isNaN(v)) {
+      const kg = displayToKg(v)
+      if (kg >= 20 && kg <= 300) {
+        onUpdate({ weightKg: kg })
+      }
     }
   }
 
@@ -44,15 +49,17 @@ export function WeightSection({ entry, isHorizontal, onUpdate, lastWeight }: Pro
   function handleTapPlaceholder() {
     if (lastWeight) {
       onUpdate({ weightKg: lastWeight })
-      setInputValue(lastWeight.toString())
+      setInputValue(kgToDisplay(lastWeight).toString())
     } else {
       setEditing(true)
       setInputValue('')
     }
   }
 
+  const unitLabel = unit === 'lbs' ? 'libras' : 'kilogramos'
+
   const subtitle = entry.weightKg !== undefined
-    ? `${entry.weightKg} kg registrado`
+    ? `${kgToDisplay(entry.weightKg)} ${unit} registrado`
     : lastWeight
       ? 'Toca para usar el anterior'
       : 'Control corporal'
@@ -81,16 +88,14 @@ export function WeightSection({ entry, isHorizontal, onUpdate, lastWeight }: Pro
             <div className="relative w-44 h-44 flex items-center justify-center mb-4">
               <div className="absolute inset-0 rounded-full border-2 border-amber-400/10" />
               <div className="absolute inset-2 rounded-full border border-amber-400/5" />
-              <motion.div
+              <div
                 className="absolute inset-0 rounded-full"
                 style={{ background: 'radial-gradient(circle, rgba(251,191,36,0.08) 0%, transparent 70%)' }}
-                animate={{ scale: [1, 1.05, 1] }}
-                transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
               />
               {hasValue ? (
                 <input
                   type="number"
-                  step="0.1"
+                  step={inputStepBody}
                   min="20"
                   max="300"
                   inputMode="decimal"
@@ -112,9 +117,9 @@ export function WeightSection({ entry, isHorizontal, onUpdate, lastWeight }: Pro
                 </button>
               )}
             </div>
-            <span className="text-sm font-black text-amber-400/40 uppercase tracking-[0.3em]">kilogramos</span>
+            <span className="text-sm font-black text-amber-400/40 uppercase tracking-[0.3em]">{unitLabel}</span>
             {!entry.weightKg && !editing && lastWeight && (
-              <span className="text-[10px] text-white/25 mt-2">Anterior: {lastWeight} kg</span>
+              <span className="text-[10px] text-white/25 mt-2">Anterior: {kgToDisplay(lastWeight)} {unit}</span>
             )}
           </div>
         ) : (
@@ -122,23 +127,26 @@ export function WeightSection({ entry, isHorizontal, onUpdate, lastWeight }: Pro
             <div className="flex items-center justify-center gap-3 w-full">
               <button
                 type="button"
-                onClick={() => onUpdate({ weightKg: Math.max(20, Math.round(((entry.weightKg ?? lastWeight ?? 70) - 0.1) * 10) / 10) })}
-                className="w-12 h-12 rounded-2xl bg-amber-400/10 border border-amber-400/20 flex items-center justify-center text-amber-400/60 hover:bg-amber-400/20 hover:text-amber-400 active:scale-95 transition-all shrink-0"
+                onClick={() => {
+                  const step = unit === 'lbs' ? 0.5 : 0.1
+                  const cur = entry.weightKg ?? lastWeight ?? 70
+                  const newKg = Math.max(20, Math.round((cur - step) * 100) / 100)
+                  onUpdate({ weightKg: newKg })
+                }}
+                className="w-12 h-12 rounded-2xl bg-amber-400/10 border border-amber-400/20 flex items-center justify-center text-amber-400/60 hover:bg-amber-400/20 hover:text-amber-400 active:scale-95 transition-colors shrink-0"
               >
                 <Minus size={18} />
               </button>
               <div className="relative flex flex-col items-center">
-                <motion.div
-                  className="absolute inset-0 rounded-2xl pointer-events-none"
+                <div
+                  className="absolute inset-0 rounded-2xl pointer-events-none opacity-70"
                   style={{ background: 'radial-gradient(ellipse, rgba(251,191,36,0.12) 0%, transparent 70%)' }}
-                  animate={{ opacity: [0.6, 1, 0.6] }}
-                  transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
                 />
                 <div className="flex items-baseline gap-1 relative z-10">
                   {hasValue ? (
                     <input
                       type="number"
-                      step="0.1"
+                      step={inputStepBody}
                       min="20"
                       max="300"
                       inputMode="decimal"
@@ -159,20 +167,25 @@ export function WeightSection({ entry, isHorizontal, onUpdate, lastWeight }: Pro
                       {placeholderValue}
                     </button>
                   )}
-                  <span className="text-xl font-black text-amber-400/50 pb-1">kg</span>
+                  <span className="text-xl font-black text-amber-400/50 pb-1">{unit}</span>
                 </div>
               </div>
               <button
                 type="button"
-                onClick={() => onUpdate({ weightKg: Math.min(300, Math.round(((entry.weightKg ?? lastWeight ?? 70) + 0.1) * 10) / 10) })}
-                className="w-12 h-12 rounded-2xl bg-amber-400/10 border border-amber-400/20 flex items-center justify-center text-amber-400/60 hover:bg-amber-400/20 hover:text-amber-400 active:scale-95 transition-all shrink-0"
+                onClick={() => {
+                  const step = unit === 'lbs' ? 0.5 : 0.1
+                  const cur = entry.weightKg ?? lastWeight ?? 70
+                  const newKg = Math.min(300, Math.round((cur + step) * 100) / 100)
+                  onUpdate({ weightKg: newKg })
+                }}
+                className="w-12 h-12 rounded-2xl bg-amber-400/10 border border-amber-400/20 flex items-center justify-center text-amber-400/60 hover:bg-amber-400/20 hover:text-amber-400 active:scale-95 transition-colors shrink-0"
               >
                 <Plus size={18} />
               </button>
             </div>
-            <span className="text-[10px] font-black text-amber-400/30 uppercase tracking-[0.3em]">kilogramos</span>
+            <span className="text-[10px] font-black text-amber-400/30 uppercase tracking-[0.3em]">{unitLabel}</span>
             {!entry.weightKg && !editing && lastWeight && (
-              <span className="text-[10px] text-white/25 mt-1">Anterior: {lastWeight} kg</span>
+              <span className="text-[10px] text-white/25 mt-1">Anterior: {kgToDisplay(lastWeight)} {unit}</span>
             )}
           </div>
         )}

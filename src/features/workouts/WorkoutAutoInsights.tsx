@@ -6,6 +6,8 @@ import {
 } from 'lucide-react'
 import type { EntryWorkout, ExerciseCatalog, Routine } from '@/data/types'
 import { parseDate, today, formatDate } from '@/utils/date'
+import { estimateWorkoutSet1RM, getSetVolume } from '@/utils/workoutMetrics'
+import { useWeightUnit } from '@/context/SectionPrefsContext'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -62,6 +64,8 @@ function buildInsights(
   allWorkouts: EntryWorkout[],
   catalog: ExerciseCatalog[],
   routines: Routine[],
+  unit: string,
+  kgToDisplay: (kg: number) => number,
 ): Insight[] {
   if (allWorkouts.length === 0) return []
 
@@ -129,15 +133,20 @@ function buildInsights(
 
   // ── 3. TOP ROUTINE ────────────────────────────────────────────────────────
   {
-    const freq: Record<number, number> = {}
+    const freq: Record<number, { count: number; name: string }> = {}
     allWorkouts.forEach(w => {
-      if (w.routineId != null) freq[w.routineId] = (freq[w.routineId] || 0) + 1
+      if (w.routineId == null) return
+      const current = freq[w.routineId] || { count: 0, name: w.routineName || '' }
+      current.count += 1
+      current.name = w.routineName || current.name
+      freq[w.routineId] = current
     })
-    const sorted = Object.entries(freq).sort((a, b) => b[1] - a[1])
+    const sorted = Object.entries(freq).sort((a, b) => b[1].count - a[1].count)
     if (sorted.length > 0) {
-      const [rIdStr, count] = sorted[0]
-      const routine = routines.find(r => r.id === parseInt(rIdStr))
-      const name = routine?.name ?? 'Rutina eliminada'
+      const [rIdStr, entry] = sorted[0]
+      const count = entry.count
+      const routine = routines.find(r => r.id === parseInt(rIdStr, 10))
+      const name = entry.name || routine?.name || 'Rutina eliminada'
       insights.push({
         id: 'top_routine',
         icon: <Library size={15} />,
@@ -158,7 +167,7 @@ function buildInsights(
       if (!weekVol[ws]) weekVol[ws] = 0
       w.exercises?.forEach(ex =>
         ex.sets?.forEach(s => {
-          if (s.weight && s.reps) weekVol[ws] += s.reps * s.weight
+          weekVol[ws] += getSetVolume(s, ex)
         })
       )
     })
@@ -169,7 +178,8 @@ function buildInsights(
       const endDate = new Date(weekDate)
       endDate.setDate(endDate.getDate() + 6)
       const label = `${shortDate(weekDate)} – ${shortDate(endDate)}`
-      const volStr = vol >= 1000 ? `${(vol / 1000).toFixed(1)}k kg` : `${vol} kg`
+      const displayVol = kgToDisplay(vol)
+      const volStr = displayVol >= 1000 ? `${(displayVol / 1000).toFixed(1)}k ${unit}` : `${displayVol} ${unit}`
       insights.push({
         id: 'best_volume_week',
         icon: <Trophy size={15} />,
@@ -221,7 +231,7 @@ function buildInsights(
       if (!weekVol[ws]) weekVol[ws] = 0
       w.exercises?.forEach(ex =>
         ex.sets?.forEach(s => {
-          if (s.weight && s.reps) weekVol[ws] += s.reps * s.weight
+          weekVol[ws] += getSetVolume(s, ex)
         })
       )
     })
@@ -285,8 +295,8 @@ function buildInsights(
       w.exercises?.forEach(e => {
         if (!e.exerciseName) return
         e.sets?.forEach(s => {
-          if (!s.weight || !s.reps) return
-          const rm = estimate1RM(s.weight, s.reps)
+          const rm = estimateWorkoutSet1RM(s, e)
+          if (!rm) return
           const prev = allTimeBest[e.exerciseName] ?? 0
           if (rm > prev) allTimeBest[e.exerciseName] = rm
         })
@@ -300,8 +310,8 @@ function buildInsights(
       w.exercises?.forEach(e => {
         if (!e.exerciseName) return
         e.sets?.forEach(s => {
-          if (!s.weight || !s.reps) return
-          const rm = estimate1RM(s.weight, s.reps)
+          const rm = estimateWorkoutSet1RM(s, e)
+          if (!rm) return
           if (rm >= (allTimeBest[e.exerciseName] ?? 0)) {
             const prev = recentBest[e.exerciseName]
             if (!prev || rm > prev.weight) {
@@ -316,13 +326,14 @@ function buildInsights(
     if (prs.length > 0) {
       const top = prs[0]
       const extra = prs.length > 1 ? ` (y ${prs.length - 1} más)` : ''
+      const displayTopWeight = kgToDisplay(top.weight)
       insights.push({
         id: 'recent_pr',
         icon: <Zap size={15} />,
         title: `PR reciente en ${top.name}`,
-        body: `Estimaste un 1RM de ${top.weight} kg en ${top.name} el ${shortDate(parseDate(top.date))}${extra}. ¡Nuevo máximo del historial!`,
+        body: `Estimaste un 1RM de ${displayTopWeight} ${unit} en ${top.name} el ${shortDate(parseDate(top.date))}${extra}. ¡Nuevo máximo del historial!`,
         accent: 'cyan',
-        badge: `${top.weight} kg`,
+        badge: `${displayTopWeight} ${unit}`,
         priority: 1,
       })
     }
@@ -334,7 +345,7 @@ function buildInsights(
     const mFreq: Record<string, number> = {}
     allWorkouts.forEach(w =>
       w.exercises?.forEach(e => {
-        const mg = e.exerciseCatalogId ? (catMap.get(e.exerciseCatalogId) ?? 'Otros') : 'Otros'
+        const mg = e.muscleGroup || (e.exerciseCatalogId ? (catMap.get(e.exerciseCatalogId) ?? 'Otros') : 'Otros')
         mFreq[mg] = (mFreq[mg] || 0) + (e.sets?.length ?? 0)
       })
     )
@@ -383,12 +394,25 @@ interface Props {
 }
 
 export function WorkoutAutoInsights({ allWorkouts, catalog, routines }: Props) {
+  const { unit, kgToDisplay } = useWeightUnit()
   const insights = useMemo(
-    () => buildInsights(allWorkouts, catalog, routines),
-    [allWorkouts, catalog, routines]
+    () => buildInsights(allWorkouts, catalog, routines, unit, kgToDisplay),
+    [allWorkouts, catalog, routines, unit, kgToDisplay]
   )
 
-  if (insights.length === 0) return null
+  if (insights.length === 0) {
+    return (
+      <div className="glass-card p-5 text-center">
+        <div className="w-10 h-10 rounded-2xl bg-surface-200/60 border border-white/[0.05] flex items-center justify-center mx-auto mb-3">
+          <Info size={18} className="text-white/35" />
+        </div>
+        <p className="text-sm font-semibold text-white/75">Aun no hay insights automaticos</p>
+        <p className="text-xs text-white/35 mt-1 leading-relaxed">
+          Cuando haya suficiente historial, aqui veras rachas, tendencias, PRs y recordatorios utiles.
+        </p>
+      </div>
+    )
+  }
 
   return (
     <div>

@@ -50,11 +50,10 @@ export function SleepSection({ entry, isAdv, isHorizontal, onToggleAdv, onUpdate
                 const active = entry.sleepQuality === q.v
                 const [textC, borderC, bgC] = q.color.split(' ')
                 return (
-                  <motion.button
+                  <button
                     key={q.v}
-                    whileTap={{ scale: 0.96 }}
                     onClick={() => onUpdate({ sleepQuality: active ? undefined : q.v })}
-                    className={`flex flex-col items-center justify-center gap-3 rounded-2xl border-2 transition-all duration-300 ${
+                    className={`flex flex-col items-center justify-center gap-3 rounded-2xl border-2 transition-colors duration-300 active:scale-95 ${
                       active
                         ? `${borderC} ${bgC}/15 text-white ${q.glow} ring-1 ${borderC.replace('border-', 'ring-')}/40`
                         : 'border-white/5 bg-surface-300/20 text-white/35 hover:border-white/10 hover:bg-surface-300/40'
@@ -73,7 +72,7 @@ export function SleepSection({ entry, isAdv, isHorizontal, onToggleAdv, onUpdate
                         seleccionado
                       </motion.span>
                     )}
-                  </motion.button>
+                  </button>
                 )
               })}
             </div>
@@ -84,12 +83,10 @@ export function SleepSection({ entry, isAdv, isHorizontal, onToggleAdv, onUpdate
                 const active = entry.sleepQuality === q.v
                 const [textC, borderC, bgC] = q.color.split(' ')
                 return (
-                  <motion.button
+                  <button
                     key={q.v}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
                     onClick={() => onUpdate({ sleepQuality: active ? undefined : q.v })}
-                    className={`flex flex-col items-center justify-center gap-1.5 w-full py-4 rounded-2xl border-2 transition-all duration-300 ${
+                    className={`flex flex-col items-center justify-center gap-1.5 w-full py-4 rounded-2xl border-2 transition-colors duration-300 active:scale-95 ${
                       active
                         ? `${borderC} ${bgC}/20 shadow-[0_0_15px_rgba(255,255,255,0.05)] text-white ring-1 ${borderC.replace('border-', 'ring-')}/50`
                         : 'border-white/5 bg-surface-300/20 text-white/40 hover:border-white/10 hover:bg-surface-300/40'
@@ -97,7 +94,7 @@ export function SleepSection({ entry, isAdv, isHorizontal, onToggleAdv, onUpdate
                   >
                     <q.icon size={26} className={active ? textC : 'text-white/40'} />
                     <span className="text-[10px] font-bold tracking-wide">{q.label}</span>
-                  </motion.button>
+                  </button>
                 )
               })}
             </div>
@@ -110,11 +107,9 @@ export function SleepSection({ entry, isAdv, isHorizontal, onToggleAdv, onUpdate
             <div className="flex flex-col items-center justify-center shrink-0">
               <div className="relative w-32 h-32 sm:w-40 sm:h-40 flex items-center justify-center">
                 <div className="absolute inset-0 rounded-full border border-indigo-400/20 shadow-[inset_0_0_20px_rgba(129,140,248,0.1)]" />
-                <motion.div
+                <div
                   className="absolute inset-0 rounded-full"
                   style={{ background: 'radial-gradient(circle, rgba(129,140,248,0.12) 0%, transparent 68%)' }}
-                  animate={{ scale: [1, 1.05, 1] }}
-                  transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
                 />
                 <div className="relative z-10 flex flex-col items-center mt-2">
                   <input
@@ -246,7 +241,7 @@ export function SleepSection({ entry, isAdv, isHorizontal, onToggleAdv, onUpdate
                   value={entry.sleepHours ?? ''}
                   onChange={e => onUpdate({ sleepHours: e.target.value ? parseFloat(e.target.value) : undefined })}
                   placeholder="—"
-                  className="w-[72px] bg-surface-100/60 border border-white/[0.08] rounded-xl outline-none text-center text-xl font-black text-white tabular-nums placeholder:text-white/20 focus:ring-2 focus:ring-accent/50 focus:border-accent py-1.5 transition-all"
+                  className="w-[72px] bg-surface-100/60 border border-white/[0.08] rounded-xl outline-none text-center text-xl font-black text-white tabular-nums placeholder:text-white/20 focus:ring-2 focus:ring-accent/50 focus:border-accent py-1.5 transition-colors"
                 />
               </div>
             </div>

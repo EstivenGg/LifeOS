@@ -10,6 +10,16 @@ import { DoneToggle } from '@/components/ui/DoneToggle'
 import { FocusNote } from '@/components/ui/FocusNote'
 import { PremiumSelect } from '@/components/ui/PremiumSelect'
 import { formatPace, formatSpeed } from '@/utils/date'
+import {
+  WORKOUT_SIDES,
+  getExerciseModeLabel,
+  getNextWeightColumnLabel,
+  getWeightColumnLabel,
+  isUnilateralExercise,
+  normalizeWorkoutSet,
+} from '@/utils/workoutMetrics'
+import { useWeightUnit } from '@/context/SectionPrefsContext'
+import { WorkoutRunner } from '@/features/workouts/components'
 import type * as T from '@/data/types'
 import toast from 'react-hot-toast'
 
@@ -43,6 +53,8 @@ interface Props {
   isHorizontal: boolean
   entryWorkouts: T.EntryWorkout[]
   routines: T.Routine[]
+  exerciseCatalog: T.ExerciseCatalog[]
+  routineExercises: T.RoutineExercise[]
   activityFields: Record<string, string[]>
   activeSports: T.PhysicalActivityType[]
   workoutDone: boolean
@@ -52,9 +64,11 @@ interface Props {
   onStartGeneric: (type: T.PhysicalActivityType, label: string) => void
   onUpdGenericWk: (id: number, patch: Partial<T.EntryWorkout>) => void
   onUpdSet: (wid: number, exIdx: number, setIdx: number, patch: Partial<T.WorkoutSetEntry>) => void
+  onUpdSideSet: (wid: number, exIdx: number, setIdx: number, side: T.WorkoutSide, patch: Partial<T.WorkoutSetSideEntry>) => void
   onAddSet: (wid: number, exIdx: number) => void
   onRmSet: (wid: number, exIdx: number, setIdx: number) => void
   onRmWk: (id: number) => void
+  onWorkoutCompleted?: (w: T.EntryWorkout) => void
 }
 
 // ─── Generic activity summary chips ──────────────────────────────────────────
@@ -130,12 +144,14 @@ function SessionCard({
 
 // ─── Main component ───────────────────────────────────────────────────────────
 export function WorkoutSection({
-  entry, isAdv, isHorizontal, entryWorkouts, routines, activityFields, activeSports, workoutDone,
+  entry, isAdv, isHorizontal, entryWorkouts, routines, exerciseCatalog, routineExercises, activityFields, activeSports, workoutDone,
   onToggleAdv, onUpdate, onStartWorkout, onStartGeneric,
-  onUpdGenericWk, onUpdSet, onAddSet, onRmSet, onRmWk,
+  onUpdGenericWk, onUpdSet, onUpdSideSet, onAddSet, onRmSet, onRmWk, onWorkoutCompleted,
 }: Props) {
+  const { unit, kgToDisplay, displayToKg, inputStep } = useWeightUnit()
   const [showGymPicker, setShowGymPicker] = useState(false)
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set())
+  const [runnerRoutine, setRunnerRoutine] = useState<T.Routine | null>(null)
 
   function toggleExpand(id: number) {
     setExpandedIds(prev => {
@@ -189,23 +205,22 @@ export function WorkoutSection({
           {/* ── Sport quickbar — grid fills the row evenly ── */}
           <div className="grid gap-2 mb-5" style={{ gridTemplateColumns: `repeat(${Math.min(activeSportDefs.length, 4)}, 1fr)` }}>
             {activeSportDefs.map(act => (
-              <motion.button
+              <button
                 key={act.type}
-                whileTap={{ scale: 0.92 }}
                 onClick={() => {
                   if (act.type === 'gym') {
-                    if (routines.length === 1) { handleStartWorkout(routines[0].id!); setExpandedIds(prev => new Set([...prev, -1])) }
+                    if (routines.length === 1) { setRunnerRoutine(routines[0]) }
                     else if (routines.length > 1) setShowGymPicker(true)
                     else toast('Crea una rutina primero en Actividad Física', { icon: '💪' })
                   } else {
                     onStartGeneric(act.type, act.label)
                   }
                 }}
-                className="flex flex-col items-center justify-center gap-1.5 py-3.5 rounded-2xl bg-surface-200/50 hover:bg-surface-200 active:bg-surface-300 text-white/50 hover:text-orange-400 transition-all border border-white/[0.04]"
+                className="flex flex-col items-center justify-center gap-1.5 py-3.5 rounded-2xl bg-surface-200/50 hover:bg-surface-200 text-white/50 hover:text-orange-400 transition-colors border border-white/[0.04] active:scale-90"
               >
                 <act.icon size={20} />
                 <span className="text-[9px] uppercase font-bold tracking-wider">{act.label}</span>
-              </motion.button>
+              </button>
             ))}
           </div>
 
@@ -222,15 +237,14 @@ export function WorkoutSection({
                   <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-2.5">Elige tu rutina</p>
                   <div className="space-y-1.5">
                     {routines.map(r => (
-                      <motion.button
+                      <button
                         key={r.id}
-                        whileTap={{ scale: 0.97 }}
-                        onClick={() => { onStartWorkout(r.id!); setShowGymPicker(false) }}
-                        className="w-full flex items-center gap-3 px-3 py-3 rounded-xl bg-surface-100/80 hover:bg-orange-400/10 border border-white/[0.04] hover:border-orange-400/20 transition-all text-left"
+                        onClick={() => { setRunnerRoutine(r); setShowGymPicker(false) }}
+                        className="w-full flex items-center gap-3 px-3 py-3 rounded-xl bg-surface-100/80 hover:bg-orange-400/10 border border-white/[0.04] hover:border-orange-400/20 transition-colors active:scale-95 text-left"
                       >
                         <Dumbbell size={16} className="text-orange-400 shrink-0" />
                         <span className="text-sm font-semibold">{r.name}</span>
-                      </motion.button>
+                      </button>
                     ))}
                   </div>
                 </div>
@@ -392,7 +406,7 @@ export function WorkoutSection({
                       <Dumbbell size={15} className="text-orange-400" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-bold text-orange-300/90 truncate">{routine?.name || 'Rutina de Gym'}</p>
+                      <p className="text-sm font-bold text-orange-300/90 truncate">{w.routineName || routine?.name || 'Rutina de Gym'}</p>
                       <p className="text-[10px] text-white/35">
                         {w.exercises?.length ?? 0} ejercicio{(w.exercises?.length ?? 0) !== 1 ? 's' : ''} · {totalSets} set{totalSets !== 1 ? 's' : ''}
                       </p>
@@ -400,25 +414,73 @@ export function WorkoutSection({
                   </>
                 }
               >
-                {w.exercises?.map((ex, exIdx) => (
+                {w.exercises?.map((ex, exIdx) => {
+                  const unilateral = isUnilateralExercise(ex)
+                  return (
                   <div key={exIdx} className="mb-4 last:mb-1">
-                    <p className="text-xs font-semibold text-white/55 mb-2 pl-0.5">{ex.exerciseName}</p>
+                    <div className="flex items-center justify-between gap-3 mb-2 pl-0.5">
+                      <p className="text-xs font-semibold text-white/55">{ex.exerciseName}</p>
+                      <span className="text-[9px] uppercase tracking-widest text-orange-300/55 bg-orange-400/8 px-2 py-1 rounded-lg">
+                        {getExerciseModeLabel(ex)}
+                      </span>
+                    </div>
+                    {!unilateral && (
+                      <>
                     <div className="grid grid-cols-[1.75rem,1fr,1fr,1fr,2.75rem] gap-1.5 text-[9px] font-semibold text-white/25 uppercase tracking-wide mb-1.5 px-0.5">
-                      <span /><span className="text-center">Reps</span><span className="text-center">Kg</span><span className="text-center">Próx</span><span />
+                      <span /><span className="text-center">Reps</span><span className="text-center">{unit.toUpperCase()}</span><span className="text-center">Próx</span><span />
                     </div>
                     <div className="space-y-1.5">
                       {ex.sets.map((s, si) => (
                         <div key={si} className="grid grid-cols-[1.75rem,1fr,1fr,1fr,2.75rem] gap-1.5 items-center">
                           <span className="text-[10px] text-white/20 text-center font-mono tabular-nums">{si + 1}</span>
                           <input type="number" inputMode="numeric" min="0" value={s.reps || ''} onChange={e => onUpdSet(w.id!, exIdx, si, { reps: parseInt(e.target.value) || 0 })} className="input-field h-11 px-1 text-center text-sm" />
-                          <input type="number" inputMode="decimal" min="0" step="0.5" value={s.weight ?? ''} onChange={e => onUpdSet(w.id!, exIdx, si, { weight: e.target.value ? parseFloat(e.target.value) : undefined })} className="input-field h-11 px-1 text-center text-sm" placeholder="—" />
-                          <input type="number" inputMode="decimal" min="0" step="0.5" value={s.nextWeight ?? ''} onChange={e => onUpdSet(w.id!, exIdx, si, { nextWeight: e.target.value ? parseFloat(e.target.value) : undefined })} className="input-field h-11 px-1 text-center text-sm text-orange-300/50" placeholder="—" />
+                          <input type="number" inputMode="decimal" min="0" step={inputStep} value={s.weight != null ? kgToDisplay(s.weight) : ''} onChange={e => onUpdSet(w.id!, exIdx, si, { weight: e.target.value ? displayToKg(parseFloat(e.target.value)) : undefined })} className="input-field h-11 px-1 text-center text-sm" placeholder="—" />
+                          <input type="number" inputMode="decimal" min="0" step={inputStep} value={s.nextWeight != null ? kgToDisplay(s.nextWeight) : ''} onChange={e => onUpdSet(w.id!, exIdx, si, { nextWeight: e.target.value ? displayToKg(parseFloat(e.target.value)) : undefined })} className="input-field h-11 px-1 text-center text-sm text-orange-300/50" placeholder="—" />
                           <button onClick={() => onRmSet(w.id!, exIdx, si)} aria-label="Eliminar set" className="h-11 w-full flex items-center justify-center rounded-xl text-white/15 hover:text-red-400 hover:bg-red-400/10 transition-colors">
                             <Trash2 size={13} />
                           </button>
                         </div>
                       ))}
                     </div>
+                      </>
+                    )}
+                    {unilateral && (
+                      <div className="space-y-2">
+                        {ex.sets.map((rawSet, si) => {
+                          const set = normalizeWorkoutSet(rawSet, ex)
+                          return (
+                            <div key={si} className="rounded-2xl border border-white/[0.05] bg-surface-300/20 p-3">
+                              <div className="flex items-center justify-between gap-3 mb-2">
+                                <span className="text-[10px] uppercase tracking-widest text-white/30 font-semibold">Set {si + 1}</span>
+                                <button onClick={() => onRmSet(w.id!, exIdx, si)} aria-label="Eliminar set" className="w-8 h-8 flex items-center justify-center rounded-xl text-white/15 hover:text-red-400 hover:bg-red-400/10 transition-colors">
+                                  <Trash2 size={13} />
+                                </button>
+                              </div>
+                              <div className="grid grid-cols-[2.5rem,1fr,1fr,1fr] gap-1.5 text-[9px] font-semibold text-white/25 uppercase tracking-wide mb-1.5">
+                                <span />
+                                <span className="text-center">Reps</span>
+                                <span className="text-center">{getWeightColumnLabel(ex, unit)}</span>
+                                <span className="text-center">{getNextWeightColumnLabel(ex, unit)}</span>
+                              </div>
+                              <div className="space-y-1.5">
+                                {WORKOUT_SIDES.map(side => {
+                                  const sideLabel = side === 'left' ? 'Izq' : 'Der'
+                                  const sideSet = set.sides?.[side]
+                                  return (
+                                    <div key={side} className="grid grid-cols-[2.5rem,1fr,1fr,1fr] gap-1.5 items-center">
+                                      <span className="text-[10px] text-white/35 text-center font-semibold">{sideLabel}</span>
+                                      <input type="number" inputMode="numeric" min="0" value={sideSet?.reps ?? ''} onChange={e => onUpdSideSet(w.id!, exIdx, si, side, { reps: e.target.value ? parseInt(e.target.value) : undefined })} className="input-field h-11 px-1 text-center text-sm" placeholder="-" />
+                                      <input type="number" inputMode="decimal" min="0" step={inputStep} value={sideSet?.weight != null ? kgToDisplay(sideSet.weight) : ''} onChange={e => { onUpdSideSet(w.id!, exIdx, si, side, { weight: e.target.value ? displayToKg(parseFloat(e.target.value)) : undefined }) }} className="input-field h-11 px-1 text-center text-sm" placeholder="-" />
+                                      <input type="number" inputMode="decimal" min="0" step={inputStep} value={sideSet?.nextWeight != null ? kgToDisplay(sideSet.nextWeight) : ''} onChange={e => { onUpdSideSet(w.id!, exIdx, si, side, { nextWeight: e.target.value ? displayToKg(parseFloat(e.target.value)) : undefined }) }} className="input-field h-11 px-1 text-center text-sm text-orange-300/50" placeholder="-" />
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
                     <button
                       onClick={() => onAddSet(w.id!, exIdx)}
                       className="mt-2 w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-medium text-accent/60 hover:text-accent bg-accent/5 hover:bg-accent/10 transition-colors"
@@ -426,11 +488,29 @@ export function WorkoutSection({
                       <Plus size={13} /> Agregar set
                     </button>
                   </div>
-                ))}
+                )})}
               </SessionCard>
             )
           })}
         </div>
+      )}
+
+      {/* ── Workout Runner ── */}
+      {runnerRoutine && (
+        <WorkoutRunner
+          open={!!runnerRoutine}
+          onClose={() => setRunnerRoutine(null)}
+          routine={runnerRoutine}
+          routineExercises={routineExercises.filter(e => e.routineId === runnerRoutine.id).sort((a, b) => a.sortOrder - b.sortOrder)}
+          exerciseCatalog={exerciseCatalog}
+          entryDate={entry.date}
+          allWorkouts={entryWorkouts}
+          onComplete={(savedWorkout) => {
+            setRunnerRoutine(null)
+            onWorkoutCompleted?.(savedWorkout)
+            toggleExpand(savedWorkout.id!)
+          }}
+        />
       )}
     </Card>
   )

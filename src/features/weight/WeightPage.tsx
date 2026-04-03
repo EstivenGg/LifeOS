@@ -8,6 +8,7 @@ import { db } from '@/data/db'
 import { Card } from '@/components/ui/Card'
 import { RangeSelector, rangeToDays } from '@/components/ui/RangeSelector'
 import { daysAgo, shortDate, today } from '@/utils/date'
+import { useWeightUnit } from '@/context/SectionPrefsContext'
 import type { DailyEntry } from '@/data/types'
 
 type Pt = { label: string; weight: number; date: string }
@@ -25,6 +26,7 @@ const tt = {
 function round1(n: number) { return Math.round(n * 10) / 10 }
 
 export function WeightPage() {
+  const { unit, kgToDisplay, fmtWeight } = useWeightUnit()
   const [data, setData] = useState<Pt[]>([])
   const [cur, setCur] = useState<number | undefined>()
   const [avg, setAvg] = useState(0)
@@ -56,6 +58,7 @@ export function WeightPage() {
         ws.push(e.weightKg)
       }
     }
+    // Note: ws stores raw kg; display conversion happens at render time
 
     setData(d)
 
@@ -96,10 +99,24 @@ export function WeightPage() {
   }
 
   const hasData = data.length > 1
+
+  // Derived display values (converted from kg)
+  const displayData = useMemo(() =>
+    data.map(pt => ({ ...pt, weight: kgToDisplay(pt.weight) })),
+    [data, kgToDisplay]
+  )
+  const displayCur = cur != null ? kgToDisplay(cur) : undefined
+  const displayAvg = avg ? kgToDisplay(avg) : 0
+  const displayMn = mn ? kgToDisplay(mn) : 0
+  const displayMx = mx ? kgToDisplay(mx) : 0
+  const displayWeekAvg = weekAvg ? kgToDisplay(weekAvg) : 0
+  const displayMonthAvg = monthAvg ? kgToDisplay(monthAvg) : 0
+  const displayTotalChange = totalChange ? Math.round(kgToDisplay(Math.abs(totalChange)) * 10) / 10 * Math.sign(totalChange) : 0
+
   const deltaFromAvg = useMemo(() => {
-    if (cur == null || avg === 0) return null
-    return round1(cur - avg)
-  }, [cur, avg])
+    if (displayCur == null || displayAvg === 0) return null
+    return round1(displayCur - displayAvg)
+  }, [displayCur, displayAvg])
 
   const TI = trend === 'up' ? TrendingUp : trend === 'down' ? TrendingDown : Minus
   const tc = trend === 'up' ? 'text-red-400' : trend === 'down' ? 'text-emerald-400' : 'text-white/40'
@@ -126,7 +143,7 @@ export function WeightPage() {
       </div>
 
       {/* Current weight hero */}
-      {cur != null && (
+      {displayCur != null && (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -138,12 +155,12 @@ export function WeightPage() {
               <div>
                 <p className="text-[10px] text-white/35 uppercase tracking-wider mb-1">Peso actual</p>
                 <div className="flex items-baseline gap-2">
-                  <span className="text-4xl font-black tabular-nums text-white">{cur}</span>
-                  <span className="text-lg font-bold text-amber-400/50">kg</span>
+                  <span className="text-4xl font-black tabular-nums text-white">{displayCur}</span>
+                  <span className="text-lg font-bold text-amber-400/50">{unit}</span>
                 </div>
                 {deltaFromAvg != null && (
                   <span className="text-[11px] text-amber-300/60 mt-1 inline-block">
-                    {deltaFromAvg > 0 ? '+' : ''}{deltaFromAvg} kg vs promedio
+                    {deltaFromAvg > 0 ? '+' : ''}{deltaFromAvg} {unit} vs promedio
                   </span>
                 )}
               </div>
@@ -152,9 +169,9 @@ export function WeightPage() {
                   <TI size={15} className={tc} />
                   <span className={`text-sm font-semibold ${tc}`}>{trendLabel}</span>
                 </div>
-                {totalChange !== 0 && data.length > 1 && (
+                {displayTotalChange !== 0 && data.length > 1 && (
                   <span className="text-[10px] text-white/25">
-                    {totalChange > 0 ? '+' : ''}{totalChange} kg en el periodo
+                    {displayTotalChange > 0 ? '+' : ''}{displayTotalChange} {unit} en el periodo
                   </span>
                 )}
               </div>
@@ -166,10 +183,10 @@ export function WeightPage() {
       {/* KPIs */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
         {[
-          { label: 'Prom. semanal', value: weekAvg ? `${weekAvg}` : '—', unit: 'kg', icon: <Activity size={17} className="text-amber-400/70" />, bg: 'bg-amber-500/8' },
-          { label: 'Prom. mensual', value: monthAvg ? `${monthAvg}` : '—', unit: 'kg', icon: <Target size={17} className="text-amber-400/50" />, bg: 'bg-amber-500/6' },
-          { label: 'Prom. periodo', value: avg ? `${avg}` : '—', unit: 'kg', icon: <Minus size={17} className="text-white/40" />, bg: 'bg-white/5' },
-          { label: 'Rango', value: mn ? `${mn} → ${mx}` : '—', icon: <Minus size={17} className="text-white/25" />, bg: 'bg-white/5' },
+          { label: 'Prom. semanal', value: displayWeekAvg ? `${displayWeekAvg}` : '—', unit, icon: <Activity size={17} className="text-amber-400/70" />, bg: 'bg-amber-500/8' },
+          { label: 'Prom. mensual', value: displayMonthAvg ? `${displayMonthAvg}` : '—', unit, icon: <Target size={17} className="text-amber-400/50" />, bg: 'bg-amber-500/6' },
+          { label: 'Prom. periodo', value: displayAvg ? `${displayAvg}` : '—', unit, icon: <Minus size={17} className="text-white/40" />, bg: 'bg-white/5' },
+          { label: 'Rango', value: displayMn ? `${displayMn} → ${displayMx}` : '—', icon: <Minus size={17} className="text-white/25" />, bg: 'bg-white/5' },
         ].map((k, i) => (
           <motion.div
             key={k.label}
@@ -200,9 +217,9 @@ export function WeightPage() {
             {data.length > 0 && (
               <span className="text-[10px] text-white/25">{data.length} registros</span>
             )}
-            {avg > 0 && (
+            {displayAvg > 0 && (
               <span className="text-[10px] text-amber-300/70 bg-amber-500/10 px-2 py-0.5 rounded-full font-medium">
-                Prom: {avg} kg
+                Prom: {displayAvg} {unit}
               </span>
             )}
           </div>
@@ -210,7 +227,7 @@ export function WeightPage() {
 
         {hasData ? (
           <ResponsiveContainer width="100%" height={230}>
-            <AreaChart data={data}>
+            <AreaChart data={displayData}>
               <defs>
                 <linearGradient id="wG" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.25} />
@@ -232,9 +249,9 @@ export function WeightPage() {
                 tick={{ fontSize: 9, fill: 'rgba(255,255,255,.25)' }}
                 tickFormatter={(v: number) => `${v}`}
               />
-              <Tooltip {...tt} formatter={(v: number | string) => [`${v} kg`, 'Peso']} />
+              <Tooltip {...tt} formatter={(v: number | string) => [`${v} ${unit}`, 'Peso']} />
 
-              {avg > 0 && <ReferenceLine y={avg} stroke="rgba(255,255,255,.12)" strokeDasharray="4 4" />}
+              {displayAvg > 0 && <ReferenceLine y={displayAvg} stroke="rgba(255,255,255,.12)" strokeDasharray="4 4" />}
 
               <Area
                 type="monotone"

@@ -1,11 +1,12 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { X, PenLine, CheckCircle2, ListChecks, BookOpen, Dumbbell, Brain, Smartphone, GraduationCap, Moon, Timer, Droplets, Scale, Smile, Meh, Frown, Laugh, Activity, Bike, Mountain, Footprints, Flame, Trophy, Waves } from 'lucide-react'
 import { db } from '@/data/db'
-import { useSectionPrefs, SectionId } from '@/context/SectionPrefsContext'
+import { useSectionPrefs, SectionId, useWeightUnit } from '@/context/SectionPrefsContext'
 import { formatPace, formatSpeed } from '@/utils/date'
 import type * as T from '@/data/types'
+import { WORKOUT_SIDES, isUnilateralExercise, normalizeWorkoutSet } from '@/utils/workoutMetrics'
 
 const SLEEP_QUALITY: Record<number, { label: string, color: string }> = {
     1: { label: 'Mal', color: 'text-red-400' },
@@ -37,6 +38,7 @@ interface DashboardModalProps {
 export function DashboardModal({ isOpen, onClose, date, metric, icon: Icon, colorStr }: DashboardModalProps) {
     const navigate = useNavigate()
     const { advanced } = useSectionPrefs()
+    const { unit, kgToDisplay } = useWeightUnit()
     const [data, setData] = useState<any>(null)
 
     useEffect(() => {
@@ -48,39 +50,56 @@ export function DashboardModal({ isOpen, onClose, date, metric, icon: Icon, colo
         if (!metric) return
         const id = metric.id
 
-        const entry = await db.dailyEntries.get(date)
-
         if (id === 'habits') {
-            const allH = (await db.habits.toArray()).filter(h => h.active)
-            const eh = await db.entryHabits.where('entryDate').equals(date).toArray()
-            const cats = await db.habitCategories.toArray()
-            setData({ habits: allH, entryHabits: eh, categories: cats, entry })
+            const [entry, allH, eh, cats] = await Promise.all([
+                db.dailyEntries.get(date),
+                db.habits.toArray(),
+                db.entryHabits.where('entryDate').equals(date).toArray(),
+                db.habitCategories.toArray(),
+            ])
+            setData({ habits: allH.filter(h => h.active), entryHabits: eh, categories: cats, entry })
         }
         else if (id === 'reading') {
-            const er = await db.entryReadings.where('entryDate').equals(date).toArray()
-            const books = await db.books.toArray()
+            const [entry, er, books] = await Promise.all([
+                db.dailyEntries.get(date),
+                db.entryReadings.where('entryDate').equals(date).toArray(),
+                db.books.toArray(),
+            ])
             setData({ readings: er, books, entry })
         }
         else if (id === 'workout') {
-            const ew = await db.entryWorkouts.where('entryDate').equals(date).toArray()
-            const rut = await db.routines.toArray()
+            const [entry, ew, rut] = await Promise.all([
+                db.dailyEntries.get(date),
+                db.entryWorkouts.where('entryDate').equals(date).toArray(),
+                db.routines.toArray(),
+            ])
             setData({ workouts: ew, routines: rut, entry })
         }
         else if (id === 'study') {
-            const es = await db.entryStudy.where('entryDate').equals(date).toArray()
-            const plat = await db.studyPlatforms.toArray()
+            const [entry, es, plat] = await Promise.all([
+                db.dailyEntries.get(date),
+                db.entryStudy.where('entryDate').equals(date).toArray(),
+                db.studyPlatforms.toArray(),
+            ])
             setData({ studies: es, platforms: plat, entry })
         }
         else if (id === 'screentime') {
-            const eu = await db.entryAppUsage.where('entryDate').equals(date).toArray()
-            const apps = await db.appCatalog.toArray()
-            setData({ usages: eu, apps: apps, entry })
+            const [entry, eu, apps] = await Promise.all([
+                db.dailyEntries.get(date),
+                db.entryAppUsage.where('entryDate').equals(date).toArray(),
+                db.appCatalog.toArray(),
+            ])
+            setData({ usages: eu, apps, entry })
         }
         else if (id === 'pomodoro') {
-            const poms = await db.pomodoroSessions.where('entryDate').equals(date).toArray()
+            const [entry, poms] = await Promise.all([
+                db.dailyEntries.get(date),
+                db.pomodoroSessions.where('entryDate').equals(date).toArray(),
+            ])
             setData({ poms, entry })
         }
         else {
+            const entry = await db.dailyEntries.get(date)
             setData({ entry })
         }
     }
@@ -221,21 +240,46 @@ export function DashboardModal({ isOpen, onClose, date, metric, icon: Icon, colo
                             <div key={w.id} className="bg-surface-200/50 p-3 rounded-xl">
                                 <div className="flex items-center gap-2 mb-2 pb-2 border-b border-white/5">
                                     <Dumbbell size={14} className="text-orange-400" />
-                                    <span className="font-semibold text-sm">{r?.name || 'Rutina Gimnasio'}</span>
+                                    <span className="font-semibold text-sm">{w.routineName || r?.name || 'Rutina Gimnasio'}</span>
                                 </div>
                                 <div className="space-y-3">
                                     {w.exercises?.map((ex: any, i: number) => (
                                         <div key={i}>
                                             <span className="text-xs text-white/60 mb-1 inline-block">{ex.exerciseName}</span>
                                             <div className="space-y-1">
-                                                {ex.sets.map((set: any, j: number) => (
-                                                    <div key={j} className="flex items-center gap-4 text-[10px] ml-2">
-                                                        <span className="text-white/30 font-mono w-4">{j + 1}.</span>
-                                                        <span className="w-16 text-center bg-surface-300/30 rounded px-1">{set.reps || 0} reps</span>
-                                                        <span className="w-16 text-center bg-surface-300/30 rounded px-1">{set.weight ? `${set.weight}kg` : '-'}</span>
-                                                        <span className="w-16 text-center bg-surface-300/30 rounded px-1">{set.rpe ? `RPE ${set.rpe}` : '-'}</span>
-                                                    </div>
-                                                ))}
+                                                {ex.sets.map((rawSet: any, j: number) => {
+                                                    const set = normalizeWorkoutSet(rawSet, ex)
+                                                    if (isUnilateralExercise(ex)) {
+                                                        return (
+                                                            <div key={j} className="ml-2 rounded-lg bg-surface-300/20 px-2 py-2 text-[10px] space-y-1.5">
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="text-white/30 font-mono w-4">{j + 1}.</span>
+                                                                    <span className="text-white/45 uppercase tracking-wide">Set unilateral</span>
+                                                                </div>
+                                                                {WORKOUT_SIDES.map(side => {
+                                                                    const sideSet = set.sides?.[side]
+                                                                    const sideLabel = side === 'left' ? 'Izq' : 'Der'
+                                                                    return (
+                                                                        <div key={side} className="flex items-center gap-3 ml-6">
+                                                                            <span className="w-7 text-white/40">{sideLabel}</span>
+                                                                            <span className="w-16 text-center bg-surface-300/30 rounded px-1">{sideSet?.reps ?? '-'} reps</span>
+                                                                            <span className="w-16 text-center bg-surface-300/30 rounded px-1">{sideSet?.weight != null ? `${kgToDisplay(sideSet.weight)}${unit}` : '-'}</span>
+                                                                        </div>
+                                                                    )
+                                                                })}
+                                                            </div>
+                                                        )
+                                                    }
+
+                                                    return (
+                                                        <div key={j} className="flex items-center gap-4 text-[10px] ml-2">
+                                                            <span className="text-white/30 font-mono w-4">{j + 1}.</span>
+                                                            <span className="w-16 text-center bg-surface-300/30 rounded px-1">{set.reps || 0} reps</span>
+                                                            <span className="w-16 text-center bg-surface-300/30 rounded px-1">{set.weight ? `${kgToDisplay(set.weight)}${unit}` : '-'}</span>
+                                                            <span className="w-16 text-center bg-surface-300/30 rounded px-1">{set.rpe ? `RPE ${set.rpe}` : '-'}</span>
+                                                        </div>
+                                                    )
+                                                })}
                                             </div>
                                         </div>
                                     ))}
@@ -347,7 +391,81 @@ export function DashboardModal({ isOpen, onClose, date, metric, icon: Icon, colo
             )
         }
 
-        // Default / Just show the generic card value as it has no extra deep fields
+        if (metric!.id === 'mood') {
+            const { entry } = data
+            if (!entry?.mood) return <p className="text-sm text-center text-white/40 py-4">Sin registro de ánimo.</p>
+            const MOOD_LABELS: Record<number, { label: string; color: string }> = {
+                1: { label: 'Muy mal', color: 'text-red-400' },
+                2: { label: 'Mal', color: 'text-orange-400' },
+                3: { label: 'Normal', color: 'text-amber-400' },
+                4: { label: 'Bien', color: 'text-emerald-400' },
+                5: { label: 'Muy bien', color: 'text-green-400' },
+            }
+            const m = MOOD_LABELS[entry.mood]
+            return (
+                <div className="flex flex-col items-center py-4 gap-2">
+                    <div className={`text-5xl font-black ${m?.color}`}>{entry.mood}</div>
+                    <span className={`text-sm font-semibold ${m?.color}`}>{m?.label}</span>
+                </div>
+            )
+        }
+
+        if (metric!.id === 'water') {
+            const { entry } = data
+            if (!entry?.waterMl) return <p className="text-sm text-center text-white/40 py-4">Sin registro de agua.</p>
+            const liters = (entry.waterMl / 1000).toFixed(1)
+            const pct = Math.min((entry.waterMl / 2500) * 100, 100)
+            return (
+                <div className="flex flex-col items-center py-4 gap-3">
+                    <div className="w-full h-3 rounded-full bg-surface-300/60 overflow-hidden">
+                        <div className="h-full rounded-full bg-sky-400" style={{ width: `${pct}%` }} />
+                    </div>
+                    <p className="text-xs text-white/40">{liters}L de 2.5L meta diaria</p>
+                </div>
+            )
+        }
+
+        if (metric!.id === 'weight') {
+            const { entry } = data
+            if (!entry?.weightKg) return <p className="text-sm text-center text-white/40 py-4">Sin registro de peso.</p>
+            return (
+                <div className="flex flex-col items-center py-4 gap-1">
+                    <div className="text-4xl font-black text-amber-400">{kgToDisplay(entry.weightKg)}<span className="text-lg text-white/40">{unit}</span></div>
+                </div>
+            )
+        }
+
+        if (metric!.id === 'meditation') {
+            const { entry } = data
+            if (!isAdv) {
+                if (!entry?.meditationDone) return <p className="text-sm text-center text-white/40 py-4">Sin registro de meditación.</p>
+                return (
+                    <div className="bg-violet-400/10 p-4 rounded-xl flex items-center justify-center gap-3">
+                        <CheckCircle2 size={24} className="text-violet-400" />
+                        <span className="font-semibold text-violet-400">Meditación realizada</span>
+                    </div>
+                )
+            }
+            if (!entry?.meditationMinutes) return <p className="text-sm text-center text-white/40 py-4">Sin minutos registrados.</p>
+            return (
+                <div className="flex flex-col items-center py-4 gap-1">
+                    <div className="text-4xl font-black text-violet-400">{entry.meditationMinutes}<span className="text-lg text-white/40">min</span></div>
+                </div>
+            )
+        }
+
+        if (metric!.id === 'pomodoro') {
+            const { poms } = data
+            if (!poms || poms.length === 0) return <p className="text-sm text-center text-white/40 py-4">Sin sesiones pomodoro.</p>
+            const completed = poms.filter((p: any) => p.completed).length
+            return (
+                <div className="flex flex-col items-center py-4 gap-3">
+                    <div className="text-4xl font-black text-rose-400">{completed}<span className="text-lg text-white/40">/{poms.length}</span></div>
+                    <p className="text-xs text-white/40">sesiones completadas</p>
+                </div>
+            )
+        }
+
         return null
     }
 
@@ -355,19 +473,21 @@ export function DashboardModal({ isOpen, onClose, date, metric, icon: Icon, colo
 
     return (
         <AnimatePresence>
-            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <div className="fixed inset-0 z-[100] flex items-end md:items-center justify-center">
                 <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
+                    transition={{ duration: 0.15 }}
                     onClick={onClose}
-                    className="absolute inset-0 backdrop-blur-sm bg-black/60"
+                    className="absolute inset-0 bg-black/70"
                 />
                 <motion.div
-                    initial={{ opacity: 0, scale: 0.95, y: 10 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.95, y: 10 }}
-                    className="relative w-full max-w-sm max-h-[85vh] flex flex-col bg-surface-100 border border-white/10 rounded-3xl shadow-2xl overflow-hidden"
+                    initial={{ opacity: 0, y: 40 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 40 }}
+                    transition={{ duration: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
+                    className="relative w-full max-w-sm max-h-[90vh] md:max-h-[85vh] flex flex-col bg-surface-100 border border-white/[0.06] rounded-t-3xl md:rounded-3xl shadow-2xl overflow-hidden md:m-4"
                 >
                     {/* Header */}
                     <div className="shrink-0 p-5 flex flex-col items-center relative border-b border-white/[0.04]">

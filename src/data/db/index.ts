@@ -193,6 +193,10 @@ export class LifeOSDB extends Dexie {
     this.version(8).stores({
       tasks: '++id, listId, status, dueDate, parentId, recurrenceSourceId, sortOrder, createdAt, archived, recurrenceEndDate',
     })
+    this.version(9).stores({
+      routines: '++id, name',
+      routineExercises: '++id, routineId, exerciseCatalogId, sortOrder',
+    })
   }
 }
 

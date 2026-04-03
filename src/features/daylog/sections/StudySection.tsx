@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion'
+
 import { GraduationCap, Plus, Trash2 } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import { ModeToggle } from '@/components/ui/ModeToggle'
@@ -65,7 +65,7 @@ export function StudySection({
         <div className={`flex-1 overflow-y-auto disable-scrollbars px-2 sm:px-4 relative ${isHorizontal ? 'pb-4 fade-bottom-mask' : ''}`}>
           <div className="space-y-4">
             {entryStudies.map(s => (
-              <div key={s.id} className="relative p-5 sm:p-6 bg-surface-200/30 rounded-[28px] border border-white/5 transition-all">
+              <div key={s.id} className="relative p-5 sm:p-6 bg-surface-200/30 rounded-[28px] border border-white/5 transition-colors">
                 <div className="flex items-center justify-between mb-5">
                   <input
                     value={s.topic || ''}
@@ -126,15 +126,13 @@ export function StudySection({
               </div>
             ))}
 
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.96 }}
+            <button
               onClick={onAdd}
-              className="w-full flex items-center justify-center gap-2 py-4 rounded-[20px] bg-blue-500/10 hover:bg-blue-500/20 text-blue-400/80 hover:text-blue-300 font-bold transition-all border border-blue-500/20 shadow-[0_4px_15px_rgba(96,165,250,0.05)]"
+              className="w-full flex items-center justify-center gap-2 py-4 rounded-[20px] bg-blue-500/10 hover:bg-blue-500/20 text-blue-400/80 hover:text-blue-300 font-bold transition-colors border border-blue-500/20 shadow-[0_4px_15px_rgba(96,165,250,0.05)] active:scale-95"
             >
               <Plus size={18} strokeWidth={3} />
               Añadir sesión
-            </motion.button>
+            </button>
           </div>
         </div>
       )}

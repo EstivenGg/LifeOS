@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
 import { CalendarDays, Repeat, Trash2, Pencil, ChevronDown, ChevronRight, Square, SquareCheckBig } from 'lucide-react'
 import type { Task } from '@/data/types'
 import { todayStr } from '../taskOperations'
@@ -22,9 +21,7 @@ export function TaskRow({ t, depth = 0, subtasksOf, parseTags, toggleStatus, set
 
   return (
     <>
-      <motion.div
-        initial={{ opacity: 0, x: -8 }}
-        animate={{ opacity: 1, x: 0 }}
+      <div
         className={`group/row flex items-start gap-2 py-2.5 px-3 rounded-xl active:bg-surface-200/50 md:hover:bg-surface-200/40 transition-colors ${
           t.status === 'completed' ? 'opacity-50' : ''
         }`}
@@ -86,17 +83,15 @@ export function TaskRow({ t, depth = 0, subtasksOf, parseTags, toggleStatus, set
             {showSubs ? <ChevronDown size={14} className="text-white/30" /> : <ChevronRight size={14} className="text-white/30" />}
           </button>
         )}
-      </motion.div>
+      </div>
 
-      <AnimatePresence>
-        {showSubs && subs.map(s => (
-          <TaskRow 
-            key={s.id} t={s} depth={depth + 1} 
-            subtasksOf={subtasksOf} parseTags={parseTags} toggleStatus={toggleStatus}
-            setDetailTask={setDetailTask} openEditTask={openEditTask} requestDeleteTask={requestDeleteTask}
-          />
-        ))}
-      </AnimatePresence>
+      {showSubs && subs.map(s => (
+        <TaskRow
+          key={s.id} t={s} depth={depth + 1}
+          subtasksOf={subtasksOf} parseTags={parseTags} toggleStatus={toggleStatus}
+          setDetailTask={setDetailTask} openEditTask={openEditTask} requestDeleteTask={requestDeleteTask}
+        />
+      ))}
     </>
   )
 }

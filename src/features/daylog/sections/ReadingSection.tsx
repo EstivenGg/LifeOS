@@ -63,17 +63,16 @@ export function ReadingSection({
               {books.map(b => {
                 const logged = entryReadings.find(r => r.bookId === b.id)
                 return (
-                  <motion.button
+                  <button
                     key={b.id}
-                    whileTap={{ scale: 0.97 }}
                     onClick={() => logged ? onRemove(logged.id!) : onAdd(b.id!)}
-                    className={`w-full flex items-center gap-4 px-4 py-4 rounded-[20px] transition-all duration-300 border ${
+                    className={`w-full flex items-center gap-4 px-4 py-4 rounded-[20px] transition-colors duration-300 border active:scale-95 ${
                       logged
                         ? 'bg-emerald-500/10 border-emerald-500/20 shadow-[inset_0_0_12px_rgba(52,211,153,0.1)]'
                         : 'bg-surface-200/40 border-white/5 hover:border-white/10 hover:bg-surface-300/40'
                     }`}
                   >
-                    <div className={`shrink-0 w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-300 ${logged ? 'bg-emerald-500/20 shadow-[0_0_12px_rgba(52,211,153,0.3)]' : 'bg-surface-300/50'}`}>
+                    <div className={`shrink-0 w-8 h-8 rounded-xl flex items-center justify-center transition-colors duration-300 ${logged ? 'bg-emerald-500/20 shadow-[0_0_12px_rgba(52,211,153,0.3)]' : 'bg-surface-300/50'}`}>
                       <motion.div
                         initial={false}
                         animate={logged ? { scale: 1, opacity: 1 } : { scale: 0.3, opacity: 0 }}
@@ -86,7 +85,7 @@ export function ReadingSection({
                     <span className={`text-[15px] sm:text-base font-medium transition-colors duration-300 text-left line-clamp-1 flex-1 ${logged ? 'text-white' : 'text-white/60'}`}>
                       {b.title}
                     </span>
-                  </motion.button>
+                  </button>
                 )
               })}
             </div>
@@ -138,7 +137,7 @@ export function ReadingSection({
                       {/* − button */}
                       <button
                         onClick={() => onUpdate(r.id!, { pagesRead: Math.max(0, pages - 1) })}
-                        className="w-9 h-9 rounded-xl bg-white/5 hover:bg-emerald-400/10 text-white/30 hover:text-emerald-400 flex items-center justify-center transition-all active:scale-95"
+                        className="w-9 h-9 rounded-xl bg-white/5 hover:bg-emerald-400/10 text-white/30 hover:text-emerald-400 flex items-center justify-center transition-colors active:scale-95"
                       >
                         <Minus size={14} />
                       </button>
@@ -160,7 +159,7 @@ export function ReadingSection({
                       {/* + button */}
                       <button
                         onClick={() => onUpdate(r.id!, { pagesRead: pages + 1 })}
-                        className="w-9 h-9 rounded-xl bg-white/5 hover:bg-emerald-400/10 text-white/30 hover:text-emerald-400 flex items-center justify-center transition-all active:scale-95"
+                        className="w-9 h-9 rounded-xl bg-white/5 hover:bg-emerald-400/10 text-white/30 hover:text-emerald-400 flex items-center justify-center transition-colors active:scale-95"
                       >
                         <Plus size={14} />
                       </button>
@@ -169,14 +168,13 @@ export function ReadingSection({
                     {/* Quick-add chips */}
                     <div className="flex gap-1.5 mt-2">
                       {PAGE_CHIPS.map(n => (
-                        <motion.button
+                        <button
                           key={n}
-                          whileTap={{ scale: 0.88 }}
                           onClick={() => onUpdate(r.id!, { pagesRead: pages + n })}
-                          className="flex-1 py-1.5 rounded-xl text-[10px] font-black text-emerald-400/60 hover:text-emerald-300 bg-emerald-400/5 hover:bg-emerald-400/15 border border-emerald-400/10 hover:border-emerald-400/25 transition-all"
+                          className="flex-1 py-1.5 rounded-xl text-[10px] font-black text-emerald-400/60 hover:text-emerald-300 bg-emerald-400/5 hover:bg-emerald-400/15 border border-emerald-400/10 hover:border-emerald-400/25 transition-colors active:scale-90"
                         >
                           +{n}
-                        </motion.button>
+                        </button>
                       ))}
                     </div>
                   </div>
@@ -198,17 +196,16 @@ export function ReadingSection({
             {/* Add another book — expandable picker */}
             {unloggedBooks.length > 0 && (
               <div className="pt-1">
-                <motion.button
-                  whileTap={{ scale: 0.97 }}
+                <button
                   onClick={() => setPickerOpen(v => !v)}
-                  className={`w-full flex items-center justify-between gap-3 px-4 py-3.5 rounded-2xl border transition-all ${
+                  className={`w-full flex items-center justify-between gap-3 px-4 py-3.5 rounded-2xl border transition-colors active:scale-95 ${
                     pickerOpen
                       ? 'bg-emerald-400/10 border-emerald-400/25 text-emerald-300'
                       : 'bg-surface-200/40 border-white/[0.06] text-white/50 hover:border-emerald-400/20 hover:text-emerald-400/80 hover:bg-emerald-400/5'
                   }`}
                 >
                   <div className="flex items-center gap-2.5">
-                    <div className={`w-7 h-7 rounded-xl flex items-center justify-center transition-all ${pickerOpen ? 'bg-emerald-400/20' : 'bg-white/5'}`}>
+                    <div className={`w-7 h-7 rounded-xl flex items-center justify-center transition-colors ${pickerOpen ? 'bg-emerald-400/20' : 'bg-white/5'}`}>
                       <Plus size={14} className={pickerOpen ? 'text-emerald-400' : 'text-white/40'} />
                     </div>
                     <span className="text-sm font-bold">Añadir libro</span>
@@ -219,7 +216,7 @@ export function ReadingSection({
                   <motion.div animate={{ rotate: pickerOpen ? 180 : 0 }} transition={{ duration: 0.2 }}>
                     <ChevronDown size={15} className="opacity-50" />
                   </motion.div>
-                </motion.button>
+                </button>
 
                 <AnimatePresence>
                   {pickerOpen && (
@@ -232,11 +229,10 @@ export function ReadingSection({
                     >
                       <div className="mt-2 rounded-2xl border border-emerald-400/10 bg-surface-200/30 overflow-hidden">
                         {unloggedBooks.map((b, i) => (
-                          <motion.button
+                          <button
                             key={b.id}
-                            whileTap={{ scale: 0.98 }}
                             onClick={() => { onAdd(b.id!); setPickerOpen(false) }}
-                            className={`w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-emerald-400/8 transition-colors ${
+                            className={`w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-emerald-400/8 active:scale-95 transition-colors ${
                               i !== unloggedBooks.length - 1 ? 'border-b border-white/[0.04]' : ''
                             }`}
                           >
@@ -245,7 +241,7 @@ export function ReadingSection({
                             </div>
                             <span className="text-sm font-medium text-white/70 line-clamp-1 flex-1">{b.title}</span>
                             <Plus size={13} className="text-emerald-400/40 shrink-0" />
-                          </motion.button>
+                          </button>
                         ))}
                       </div>
                     </motion.div>

@@ -65,7 +65,7 @@ export async function seedDatabase() {
   const pull = await db.routines.add({ name: 'Pull (Espalda/Bíceps)' }) as number
   const leg = await db.routines.add({ name: 'Pierna' }) as number
 
-  const re = (rid: number, name: string, so: number) => ({ routineId: rid, exerciseCatalogId: exId(name), name, sortOrder: so })
+  const re = (rid: number, name: string, so: number) => ({ routineId: rid, exerciseCatalogId: exId(name), name, sortOrder: so, setsPlanned: 3, repsTarget: '8-12', restBetweenSets: 90 })
   await db.routineExercises.bulkAdd([
     re(push, 'Press banca', 0), re(push, 'Press inclinado', 1), re(push, 'Aperturas', 2), re(push, 'Press militar', 3), re(push, 'Extensiones tríceps', 4),
     re(pull, 'Dominadas', 0), re(pull, 'Remo con barra', 1), re(pull, 'Jalón al pecho', 2), re(pull, 'Curl bíceps', 3), re(pull, 'Face pulls', 4),

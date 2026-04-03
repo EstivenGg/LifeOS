@@ -11,6 +11,12 @@ import { useDebounce } from '@/hooks/useDebounce'
 import { Card } from '@/components/ui/Card'
 import { SECTION_DEFS, useSectionPrefs, SectionId } from '@/context/SectionPrefsContext'
 import type * as T from '@/data/types'
+import {
+  createDefaultWorkoutSet,
+  normalizeWorkoutExercise,
+  normalizeWorkoutSet,
+} from '@/utils/workoutMetrics'
+import { useWorkoutStarter } from '@/features/workouts/hooks'
 
 import { MoodSection }        from './sections/MoodSection'
 import { HabitsSection }      from './sections/HabitsSection'
@@ -80,6 +86,8 @@ export function DayLog() {
   const { enabled, advanced, activityFields, activeSports, dashboardOrder } = useSectionPrefs()
   const [date, setDate] = useState(paramDate || today())
   const containerRef = useRef<HTMLDivElement>(null)
+  const currentDateRef = useRef(date)
+  const loadRequestRef = useRef(0)
   const [viewMode, setViewMode] = useState<'vertical' | 'horizontal'>(() => {
     try {
       const v = localStorage.getItem(DAYLOG_VIEW_KEY)
@@ -96,6 +104,7 @@ export function DayLog() {
   const [books, setBooks] = useState<T.Book[]>([])
   const [entryReadings, setEntryReadings] = useState<T.EntryReading[]>([])
   const [routines, setRoutines] = useState<T.Routine[]>([])
+  const [exerciseCatalog, setExerciseCatalog] = useState<T.ExerciseCatalog[]>([])
   const [routineExercises, setRoutineExercises] = useState<T.RoutineExercise[]>([])
   const [entryWorkouts, setEntryWorkouts] = useState<T.EntryWorkout[]>([])
   const [apps, setApps] = useState<T.AppCatalog[]>([])
@@ -104,48 +113,87 @@ export function DayLog() {
   const [entryStudies, setEntryStudies] = useState<T.EntryStudy[]>([])
   const [importing, setImporting] = useState(false)
 
+  useEffect(() => {
+    currentDateRef.current = date
+  }, [date])
+
+  useEffect(() => {
+    const routeDate = paramDate || today()
+    setDate(prev => prev === routeDate ? prev : routeDate)
+  }, [paramDate])
+
   useEffect(() => { loadDay(date) }, [date])
 
   async function loadDay(d: string) {
-    const e = await db.dailyEntries.get(d)
-    setEntry(e || { date: d })
+    const requestId = ++loadRequestRef.current
+    const [
+      e,
+      nextCategories,
+      allHabits,
+      nextEntryHabits,
+      nextBooks,
+      nextEntryReadings,
+      nextRoutines,
+      catalog,
+      nextRoutineExercises,
+      rawWorkouts,
+      nextApps,
+      nextAppUsages,
+      nextPlatforms,
+      nextEntryStudies,
+    ] = await Promise.all([
+      db.dailyEntries.get(d),
+      db.habitCategories.orderBy('sortOrder').toArray(),
+      db.habits.toArray(),
+      db.entryHabits.where('entryDate').equals(d).toArray(),
+      db.books.toArray(),
+      db.entryReadings.where('entryDate').equals(d).toArray(),
+      db.routines.toArray(),
+      db.exerciseCatalog.toArray(),
+      db.routineExercises.toArray(),
+      db.entryWorkouts.where('entryDate').equals(d).toArray(),
+      db.appCatalog.toArray(),
+      db.entryAppUsage.where('entryDate').equals(d).toArray(),
+      db.studyPlatforms.toArray(),
+      db.entryStudy.where('entryDate').equals(d).toArray(),
+    ])
 
-    // Fetch last recorded weight for placeholder
+    if (requestId !== loadRequestRef.current || currentDateRef.current !== d) return
+
+    let nextLastWeight: number | undefined
     if (!e?.weightKg) {
       const recent = await db.dailyEntries
         .where('date').below(d)
         .reverse().sortBy('date')
-      const prev = recent.find(r => r.weightKg != null)
-      setLastWeight(prev?.weightKg)
-    } else {
-      setLastWeight(undefined)
+
+      if (requestId !== loadRequestRef.current || currentDateRef.current !== d) return
+
+      nextLastWeight = recent.find(r => r.weightKg != null)?.weightKg
     }
-    setCategories(await db.habitCategories.orderBy('sortOrder').toArray())
-    const all = await db.habits.toArray()
-    setHabits(all.filter(h => h.active).sort((a, b) => a.sortOrder - b.sortOrder))
-    setEntryHabits(await db.entryHabits.where('entryDate').equals(d).toArray())
-    setBooks(await db.books.toArray())
-    setEntryReadings(await db.entryReadings.where('entryDate').equals(d).toArray())
-    setRoutines(await db.routines.toArray())
-    setRoutineExercises(await db.routineExercises.toArray())
-    const rawWorkouts = await db.entryWorkouts.where('entryDate').equals(d).toArray()
+
+    const catalogById = new Map(catalog.map(ex => [ex.id, ex]))
     const migrated = rawWorkouts.map(w => ({
       ...w,
-      exercises: w.exercises.map((ex: any) => {
-        if (Array.isArray(ex.sets)) return ex
-        const numSets = typeof ex.sets === 'number' ? ex.sets : 3
-        return {
-          exerciseCatalogId: ex.exerciseCatalogId,
-          exerciseName: ex.exerciseName,
-          sets: Array.from({ length: numSets }, () => ({ reps: ex.reps || 10, weight: ex.weight, rpe: ex.rpe }))
-        }
-      })
+      exercises: w.exercises.map((ex: any) =>
+        normalizeWorkoutExercise(ex, typeof ex.exerciseCatalogId === 'number' ? catalogById.get(ex.exerciseCatalogId) : undefined),
+      ),
     }))
+
+    setEntry(e || { date: d })
+    setLastWeight(e?.weightKg ? undefined : nextLastWeight)
+    setCategories(nextCategories)
+    setHabits(allHabits.filter(h => h.active).sort((a, b) => a.sortOrder - b.sortOrder))
+    setEntryHabits(nextEntryHabits)
+    setBooks(nextBooks)
+    setEntryReadings(nextEntryReadings)
+    setRoutines(nextRoutines)
+    setExerciseCatalog(catalog)
+    setRoutineExercises(nextRoutineExercises)
     setEntryWorkouts(migrated)
-    setApps(await db.appCatalog.toArray())
-    setAppUsages(await db.entryAppUsage.where('entryDate').equals(d).toArray())
-    setPlatforms(await db.studyPlatforms.toArray())
-    setEntryStudies(await db.entryStudy.where('entryDate').equals(d).toArray())
+    setApps(nextApps)
+    setAppUsages(nextAppUsages)
+    setPlatforms(nextPlatforms)
+    setEntryStudies(nextEntryStudies)
   }
 
   const saveEntry = useDebounce(async (u: T.DailyEntry) => { await db.dailyEntries.put(u); showSaved() }, 400)
@@ -199,48 +247,27 @@ export function DayLog() {
   async function rmReading(id: number) { await db.entryReadings.delete(id); setEntryReadings(p => p.filter(r => r.id !== id)); showSaved() }
 
   // ── Workouts ─────────────────────────────────────────────────────────────────
+  const { buildInitialSession } = useWorkoutStarter()
+
   async function startWorkout(routineId: number) {
     if (entryWorkouts.find(w => w.routineId === routineId)) return
+    const routine = routines.find(r => r.id === routineId)
     const exs = routineExercises.filter(e => e.routineId === routineId).sort((a, b) => a.sortOrder - b.sortOrder)
 
-    // Find the last time this routine was done to pre-fill weights
-    const prevWorkouts = await db.entryWorkouts
-      .where('routineId').equals(routineId)
-      .toArray()
-    const prev = prevWorkouts
-      .filter(w => w.entryDate < date)
-      .sort((a, b) => b.entryDate.localeCompare(a.entryDate))[0]
+    if (!routine) return
 
-    // Build a map: exerciseCatalogId → last sets data
-    const lastExMap = new Map<number, T.WorkoutSetEntry[]>()
-    if (prev?.exercises) {
-      for (const ex of prev.exercises) {
-        lastExMap.set(ex.exerciseCatalogId, ex.sets)
-      }
-    }
-
-    const exercises: T.EntryWorkoutExercise[] = exs.map(e => {
-      const lastSets = lastExMap.get(e.exerciseCatalogId)
-      if (lastSets && lastSets.length > 0) {
-        // Pre-fill: use nextWeight if set, otherwise use the weight from last time
-        return {
-          exerciseCatalogId: e.exerciseCatalogId,
-          exerciseName: e.name,
-          sets: lastSets.map(s => ({
-            reps: s.reps,
-            weight: s.nextWeight ?? s.weight,
-          })),
-        }
-      }
-      return {
-        exerciseCatalogId: e.exerciseCatalogId,
-        exerciseName: e.name,
-        sets: [{ reps: 10 }, { reps: 10 }, { reps: 10 }],
-      }
+    // Build initial session using the hook (pre-fills weights from history)
+    const exercises = await buildInitialSession({
+      routine,
+      routineExercises: exs,
+      exerciseCatalog,
+      allWorkouts: entryWorkouts,
+      entryDate: date,
     })
 
-    const id = await db.entryWorkouts.add({ entryDate: date, routineId, type: 'gym', exercises })
-    setEntryWorkouts(p => [...p, { id: id as number, entryDate: date, routineId, type: 'gym', exercises }])
+    const workout: T.EntryWorkout = { entryDate: date, routineId, routineName: routine.name, type: 'gym', exercises }
+    const id = await db.entryWorkouts.add(workout)
+    setEntryWorkouts(p => [...p, { id: id as number, ...workout }])
     showSaved()
   }
 
@@ -260,7 +287,42 @@ export function DayLog() {
       if (w.id !== wid) return w
       const exercises = w.exercises.map((ex, ei) => {
         if (ei !== exIdx) return ex
-        return { ...ex, sets: ex.sets.map((s, si) => si === setIdx ? { ...s, ...patch } : s) }
+        return {
+          ...ex,
+          sets: ex.sets.map((s, si) => si === setIdx ? normalizeWorkoutSet({ ...s, ...patch }, ex) : s),
+        }
+      })
+      const u = { ...w, exercises }; saveWk(u); return u
+    }))
+  }
+  function updSideSet(
+    wid: number,
+    exIdx: number,
+    setIdx: number,
+    side: T.WorkoutSide,
+    patch: Partial<T.WorkoutSetSideEntry>,
+  ) {
+    setEntryWorkouts(p => p.map(w => {
+      if (w.id !== wid) return w
+      const exercises = w.exercises.map((ex, ei) => {
+        if (ei !== exIdx) return ex
+        return {
+          ...ex,
+          sets: ex.sets.map((s, si) => {
+            if (si !== setIdx) return s
+            const normalized = normalizeWorkoutSet(s, ex)
+            return normalizeWorkoutSet({
+              ...normalized,
+              sides: {
+                ...normalized.sides,
+                [side]: {
+                  ...normalized.sides?.[side],
+                  ...patch,
+                },
+              },
+            }, ex)
+          }),
+        }
       })
       const u = { ...w, exercises }; saveWk(u); return u
     }))
@@ -270,8 +332,8 @@ export function DayLog() {
       if (w.id !== wid) return w
       const exercises = w.exercises.map((ex, ei) => {
         if (ei !== exIdx) return ex
-        const lastSet = ex.sets[ex.sets.length - 1] || { reps: 10 }
-        return { ...ex, sets: [...ex.sets, { ...lastSet }] }
+        const lastSet = ex.sets[ex.sets.length - 1]
+        return { ...ex, sets: [...ex.sets, createDefaultWorkoutSet(ex, lastSet)] }
       })
       const u = { ...w, exercises }; saveWk(u); return u
     }))
@@ -294,7 +356,7 @@ export function DayLog() {
   async function rmApp(id: number) { await db.entryAppUsage.delete(id); setAppUsages(p => p.filter(a => a.id !== id)); showSaved() }
 
   // ── Screen time import ────────────────────────────────────────────────────
-  async function importTodayScreenTime(silent = false) {
+  async function importTodayScreenTime(silent = false, targetDate = date) {
     if (!isAndroid) { if (!silent) toast.error('Solo disponible en Android'); return }
     setImporting(true)
     try {
@@ -308,7 +370,7 @@ export function DayLog() {
       }
       const from = new Date(); from.setHours(0, 0, 0, 0)
       const usageData = await getUsageByApps(from, new Date())
-      const todayEntries = usageData.filter(e => e.dateKey === date)
+      const todayEntries = usageData.filter(e => e.dateKey === targetDate)
       if (todayEntries.length === 0) { if (!silent) toast('Sin datos de uso para hoy', { icon: 'ℹ️' }); setImporting(false); return }
       const installed = await getInstalledApps()
       const labelMap: Record<string, string> = {}
@@ -329,15 +391,30 @@ export function DayLog() {
           cat = { id: newId as number, name: label, icon: '📱', category: 'Importado', packageName: e.packageName }
           catalogByPkg[e.packageName] = cat
         }
-        const existing = await db.entryAppUsage.where('entryDate').equals(date).and((u: T.EntryAppUsage) => u.appId === cat!.id!).first()
+        const existing = await db.entryAppUsage.where('entryDate').equals(targetDate).and((u: T.EntryAppUsage) => u.appId === cat!.id!).first()
         if (existing) await db.entryAppUsage.update(existing.id!, { minutes: e.totalMinutes })
-        else await db.entryAppUsage.add({ entryDate: date, appId: cat.id!, minutes: e.totalMinutes })
+        else await db.entryAppUsage.add({ entryDate: targetDate, appId: cat.id!, minutes: e.totalMinutes })
       }
       const totalMin = Math.round(totalMs / 60_000)
-      const updated = { ...entry, screenTimeMinutes: totalMin, date }
-      await db.dailyEntries.put(updated)
+      const existingEntry = await db.dailyEntries.get(targetDate)
+      await db.dailyEntries.put({
+        ...(existingEntry || { date: targetDate }),
+        date: targetDate,
+        screenTimeMinutes: totalMin,
+      })
+
+      const [nextApps, nextAppUsages] = await Promise.all([
+        db.appCatalog.toArray(),
+        db.entryAppUsage.where('entryDate').equals(targetDate).toArray(),
+      ])
+
+      if (currentDateRef.current === targetDate) {
+        setEntry(prev => prev.date === targetDate ? { ...prev, date: targetDate, screenTimeMinutes: totalMin } : prev)
+        setApps(nextApps)
+        setAppUsages(nextAppUsages)
+      }
+
       if (!silent) toast.success(`Importado: ${Math.floor(totalMin / 60)}h ${totalMin % 60}m en pantalla`)
-      loadDay(date)
     } catch (err) { console.error(err); if (!silent) toast.error('Error al importar datos') }
     finally { setImporting(false) }
   }
@@ -465,7 +542,7 @@ export function DayLog() {
   }
 
   function sectionClass(_id: SectionId, wide = false) {
-    if (isHorizontal) return 'snap-center shrink-0 w-full px-2 sm:px-4 flex flex-col justify-start h-full'
+    if (isHorizontal) return 'snap-center shrink-0 w-full px-2 sm:px-4 flex flex-col items-center justify-start h-full overflow-y-auto pb-20 [&>*]:w-full [&>*]:max-w-lg'
     return `scroll-mt-24${wide ? ' md:col-span-2' : ''}`
   }
 
@@ -482,12 +559,12 @@ export function DayLog() {
         <div className="flex items-center justify-between mb-5 mt-2">
           <div className="flex items-center gap-4">
             <div className="flex gap-1.5">
-              <motion.button whileTap={{ scale: 0.9 }} onClick={() => goDate(-1)} className="w-10 h-10 rounded-full bg-surface-200/50 flex items-center justify-center text-white/50 hover:text-white hover:bg-surface-200 border border-white/[0.04] transition-all shadow-sm backdrop-blur-md">
+              <button onClick={() => goDate(-1)} className="w-10 h-10 rounded-full bg-surface-200/50 flex items-center justify-center text-white/50 hover:text-white hover:bg-surface-200 border border-white/[0.04] transition-colors shadow-sm active:scale-90">
                 <ChevronLeft size={18} />
-              </motion.button>
-              <motion.button whileTap={{ scale: 0.9 }} onClick={() => goDate(1)} className="w-10 h-10 rounded-full bg-surface-200/50 flex items-center justify-center text-white/50 hover:text-white hover:bg-surface-200 border border-white/[0.04] transition-all shadow-sm backdrop-blur-md">
+              </button>
+              <button onClick={() => goDate(1)} className="w-10 h-10 rounded-full bg-surface-200/50 flex items-center justify-center text-white/50 hover:text-white hover:bg-surface-200 border border-white/[0.04] transition-colors shadow-sm active:scale-90">
                 <ChevronRight size={18} />
-              </motion.button>
+              </button>
             </div>
             <div className="flex flex-col">
               <p className="text-[10px] uppercase tracking-[0.25em] text-accent/80 font-bold mb-0.5">Daylog</p>
@@ -498,17 +575,17 @@ export function DayLog() {
           </div>
           <div className="flex items-center gap-2">
             {date !== today() && (
-              <motion.button whileTap={{ scale: 0.95 }} onClick={() => { setDate(today()); navigate('/daylog', { replace: true }) }} className="px-3 py-1.5 rounded-full text-xs font-bold text-accent bg-accent/10 border border-accent/20 hover:bg-accent/20 transition-all shadow-sm">
+              <button onClick={() => { setDate(today()); navigate('/daylog', { replace: true }) }} className="px-3 py-1.5 rounded-full text-xs font-bold text-accent bg-accent/10 border border-accent/20 hover:bg-accent/20 transition-colors shadow-sm active:scale-95">
                 Hoy
-              </motion.button>
+              </button>
             )}
-            <div className="flex items-center rounded-xl bg-surface-200/60 p-1 gap-1 border border-white/[0.04] shadow-inner backdrop-blur-md">
-              <motion.button whileTap={{ scale: 0.9 }} onClick={() => setViewMode('vertical')} className={`p-2 rounded-lg transition-all ${!isHorizontal ? 'bg-surface-100/90 text-white shadow-md border border-white/10' : 'text-white/40 hover:text-white/70 hover:bg-white/5'}`}>
+            <div className="flex items-center rounded-xl bg-surface-200/60 p-1 gap-1 border border-white/[0.04] shadow-inner">
+              <button onClick={() => setViewMode('vertical')} className={`p-2 rounded-lg transition-colors active:scale-90 ${!isHorizontal ? 'bg-surface-100/90 text-white shadow-md border border-white/10' : 'text-white/40 hover:text-white/70 hover:bg-white/5'}`}>
                 <Rows3 size={16} />
-              </motion.button>
-              <motion.button whileTap={{ scale: 0.9 }} onClick={() => setViewMode('horizontal')} className={`p-2 rounded-lg transition-all ${isHorizontal ? 'bg-surface-100/90 text-white shadow-md border border-white/10' : 'text-white/40 hover:text-white/70 hover:bg-white/5'}`}>
+              </button>
+              <button onClick={() => setViewMode('horizontal')} className={`p-2 rounded-lg transition-colors active:scale-90 ${isHorizontal ? 'bg-surface-100/90 text-white shadow-md border border-white/10' : 'text-white/40 hover:text-white/70 hover:bg-white/5'}`}>
                 <Columns3 size={16} />
-              </motion.button>
+              </button>
             </div>
           </div>
         </div>
@@ -523,7 +600,7 @@ export function DayLog() {
             <span className="text-white/80 tabular-nums">{Math.round(progressPercent)}%</span>
           </div>
           <div className="h-2 rounded-full bg-surface-300/40 relative overflow-hidden border border-white/5 shadow-inner">
-            <div className="h-full rounded-full bg-gradient-to-r from-accent to-accent-light transition-all duration-[800ms] ease-out relative" style={{ width: `${progressPercent}%` }}>
+            <div className="h-full rounded-full bg-gradient-to-r from-accent to-accent-light transition-[width] duration-[800ms] ease-out relative" style={{ width: `${progressPercent}%` }}>
               <div className="absolute inset-0 bg-white/20 w-8 blur-md transform -skew-x-12 animate-pulse" />
             </div>
           </div>
@@ -633,12 +710,15 @@ export function DayLog() {
               <section id="daylog-section-workout" data-daylog-section="workout" className={sectionClass('workout')} style={sectionStyle('workout')}>
                 <WorkoutSection
                   entry={entry} isAdv={getIsAdv('workout')} isHorizontal={isHorizontal}
-                  entryWorkouts={entryWorkouts} routines={routines}
+                  entryWorkouts={entryWorkouts} routines={routines} exerciseCatalog={exerciseCatalog} routineExercises={routineExercises}
                   activityFields={activityFields} activeSports={activeSports as T.PhysicalActivityType[]} workoutDone={workoutDone}
                   onToggleAdv={() => toggleAdvancedDaily('workout')} onUpdate={upd}
                   onStartWorkout={startWorkout} onStartGeneric={startGenericActivity}
-                  onUpdGenericWk={updGenericWk} onUpdSet={updSet} onAddSet={addSet}
+                  onUpdGenericWk={updGenericWk} onUpdSet={updSet} onUpdSideSet={updSideSet} onAddSet={addSet}
                   onRmSet={rmSet} onRmWk={rmWk}
+                  onWorkoutCompleted={(w) => {
+                    setEntryWorkouts(p => [...p, w])
+                  }}
                 />
               </section>
             )}
@@ -650,30 +730,32 @@ export function DayLog() {
               <motion.div
                 initial={{ y: 50, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
-                className="pointer-events-auto max-w-full overflow-x-auto hide-scrollbar flex items-center gap-1.5 p-1.5 rounded-[24px] bg-surface-100/70 backdrop-blur-2xl border border-white/[0.08] shadow-[0_8px_32px_rgba(0,0,0,0.4)] ring-1 ring-white/5"
+                className="pointer-events-auto max-w-full overflow-x-auto hide-scrollbar flex items-center gap-1 p-1.5 rounded-[24px] bg-surface-100/95 border border-white/[0.08] shadow-[0_8px_32px_rgba(0,0,0,0.5)]"
               >
                 {sectionSnapshots.map((section, idx) => {
                   const Icon = section.icon
                   const tone = SECTION_TONES[section.id]
                   const isActive = activeIndex === idx
                   return (
-                    <motion.button
+                    <button
                       key={section.id}
-                      whileTap={{ scale: 0.88 }}
                       onClick={() => goToSection(idx)}
-                      className={`relative flex flex-col items-center justify-center shrink-0 w-[48px] h-[48px] rounded-[18px] transition-all duration-300 ${isActive ? 'bg-white/10 shadow-sm border border-white/10' : 'hover:bg-white/5 border border-transparent'}`}
+                      className={`relative flex flex-col items-center justify-center gap-0.5 shrink-0 w-[52px] h-[58px] rounded-[18px] transition-colors active:scale-90 ${isActive ? 'bg-white/10 shadow-sm border border-white/10' : 'border border-transparent'}`}
                     >
                       <Icon
-                        size={isActive ? 22 : 18}
-                        className={`transition-all duration-300 ${isActive ? 'text-white' : section.filled ? tone.icon : 'text-white/30'}`}
+                        size={18}
+                        className={`transition-colors ${isActive ? 'text-white' : section.filled ? tone.icon : 'text-white/30'}`}
                       />
+                      <span className={`text-[8px] font-semibold truncate w-full text-center leading-none px-0.5 transition-colors ${isActive ? 'text-white' : section.filled ? 'text-white/50' : 'text-white/25'}`}>
+                        {section.label}
+                      </span>
                       {section.filled && !isActive && (
-                        <span className="absolute top-2.5 right-2.5 w-1.5 h-1.5 rounded-full bg-emerald-400 border border-surface-100" />
+                        <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-emerald-400 border border-surface-100" />
                       )}
                       {isActive && (
-                        <div className="absolute -bottom-0.5 w-3 h-1 rounded-full bg-white shadow-[0_0_8px_rgba(255,255,255,0.8)]" />
+                        <div className="absolute -bottom-0.5 w-4 h-1 rounded-full bg-white shadow-[0_0_8px_rgba(255,255,255,0.8)]" />
                       )}
-                    </motion.button>
+                    </button>
                   )
                 })}
               </motion.div>

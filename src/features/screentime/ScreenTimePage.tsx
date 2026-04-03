@@ -438,7 +438,7 @@ export function ScreenTimePage() {
                               </div>
                             </div>
                             <div className="mt-1.5 h-1 bg-surface-300/50 rounded-full overflow-hidden">
-                              <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: bar }} />
+                              <div className="h-full rounded-full transition-[width]" style={{ width: `${pct}%`, backgroundColor: bar }} />
                             </div>
                           </div>
                         </motion.div>

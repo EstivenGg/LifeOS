@@ -6,6 +6,7 @@ import { db } from '@/data/db'
 import { today, daysAgo, daysBetween } from '@/utils/date'
 import { Card } from '@/components/ui/Card'
 import { showSaved } from '@/utils/toast'
+import { WORKOUT_SIDES } from '@/utils/workoutMetrics'
 
 export function ExportPage() {
   const [loading, setLoading] = useState(false)
@@ -81,12 +82,57 @@ export function ExportPage() {
           if (Array.isArray(exAny.sets)) {
             // New format: individual sets
             exAny.sets.forEach((s: any, si: number) => {
-              wkRows.push({ date, routine: routine?.name ?? '', exercise: exAny.exerciseName, set: si + 1, reps: s.reps, weight: s.weight ?? '', rpe: s.rpe ?? '' })
+              const baseRow = {
+                date,
+                routine: w.routineName ?? routine?.name ?? '',
+                exercise: exAny.exerciseName,
+                exerciseId: exAny.exerciseCatalogId ?? '',
+                muscleGroup: exAny.muscleGroup ?? '',
+                trackingMode: exAny.trackingMode ?? 'standard',
+                loadMode: exAny.loadMode ?? 'total',
+                set: si + 1,
+                reps: s.reps ?? '',
+                weight: s.weight ?? '',
+                nextWeight: s.nextWeight ?? '',
+                rpe: s.rpe ?? '',
+              }
+
+              if (exAny.trackingMode === 'unilateral' && s.sides) {
+                wkRows.push({
+                  ...baseRow,
+                  reps: '',
+                  weight: '',
+                  nextWeight: '',
+                  leftReps: s.sides.left?.reps ?? '',
+                  leftWeight: s.sides.left?.weight ?? '',
+                  leftNextWeight: s.sides.left?.nextWeight ?? '',
+                  rightReps: s.sides.right?.reps ?? '',
+                  rightWeight: s.sides.right?.weight ?? '',
+                  rightNextWeight: s.sides.right?.nextWeight ?? '',
+                  sidesLogged: WORKOUT_SIDES.filter(side => s.sides?.[side]?.reps != null || s.sides?.[side]?.weight != null).join(','),
+                })
+                return
+              }
+
+              wkRows.push(baseRow)
             })
           } else {
             // Old format: single row
             for (let si = 0; si < (exAny.sets || 1); si++) {
-              wkRows.push({ date, routine: routine?.name ?? '', exercise: exAny.exerciseName, set: si + 1, reps: exAny.reps, weight: exAny.weight ?? '', rpe: exAny.rpe ?? '' })
+              wkRows.push({
+                date,
+                routine: w.routineName ?? routine?.name ?? '',
+                exercise: exAny.exerciseName,
+                exerciseId: exAny.exerciseCatalogId ?? '',
+                muscleGroup: exAny.muscleGroup ?? '',
+                trackingMode: exAny.trackingMode ?? 'standard',
+                loadMode: exAny.loadMode ?? 'total',
+                set: si + 1,
+                reps: exAny.reps,
+                weight: exAny.weight ?? '',
+                nextWeight: exAny.nextWeight ?? '',
+                rpe: exAny.rpe ?? '',
+              })
             }
           }
         }

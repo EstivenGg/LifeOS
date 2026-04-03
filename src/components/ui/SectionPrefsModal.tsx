@@ -1,3 +1,4 @@
+import { memo, useCallback, useMemo } from 'react'
 import {
   DndContext,
   PointerSensor,
@@ -16,14 +17,16 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import { GripVertical, Info, ToggleLeft, ToggleRight } from 'lucide-react'
 import { Modal } from './Modal'
-import { SECTION_DEFS, SectionId, useSectionPrefs } from '@/context/SectionPrefsContext'
+import { SECTION_DEFS, SectionId, useSectionPrefs, useWeightUnit } from '@/context/SectionPrefsContext'
 
 interface Props {
   open: boolean
   onClose: () => void
 }
 
-/* ─── Color map per section for icon tinting ─────────────────────────────── */
+/* ─── Pre-built lookup map (avoids .find() per row per render) ───────────── */
+const SECTION_MAP = Object.fromEntries(SECTION_DEFS.map(d => [d.id, d])) as Record<SectionId, typeof SECTION_DEFS[number]>
+
 const ICON_COLOR: Record<SectionId, string> = {
   mood: 'text-yellow-400',
   habits: 'text-accent',
@@ -47,8 +50,8 @@ interface RowProps {
   onToggleAdvanced: () => void
 }
 
-function SortableSectionRow({ id, enabled, isAdvanced, hasAdvanced, onToggle, onToggleAdvanced }: RowProps) {
-  const def = SECTION_DEFS.find(s => s.id === id)!
+const SortableSectionRow = memo(function SortableSectionRow({ id, enabled, isAdvanced, hasAdvanced, onToggle, onToggleAdvanced }: RowProps) {
+  const def = SECTION_MAP[id]
   const Icon = def.icon
   const {
     attributes,
@@ -68,14 +71,14 @@ function SortableSectionRow({ id, enabled, isAdvanced, hasAdvanced, onToggle, on
     <div
       ref={setNodeRef}
       style={style}
-      className={`flex items-center gap-2 px-2.5 py-2.5 rounded-xl transition-colors ${
+      className={`flex items-center gap-2 px-2.5 py-2.5 rounded-xl ${
         enabled ? 'bg-surface-200/50' : 'bg-surface-200/20 opacity-50'
       } ${isDragging ? 'ring-1 ring-accent/40 z-10' : ''}`}
     >
       {/* Drag handle */}
       <button
         type="button"
-        className="p-1 text-white/25 hover:text-white/60 active:scale-95 transition-all shrink-0 cursor-grab active:cursor-grabbing"
+        className="p-1 text-white/25 shrink-0 cursor-grab active:cursor-grabbing"
         aria-label={`Mover ${def.label}`}
         style={{ touchAction: 'none' }}
         {...attributes}
@@ -129,17 +132,18 @@ function SortableSectionRow({ id, enabled, isAdvanced, hasAdvanced, onToggle, on
       </button>
     </div>
   )
-}
+})
 
 export function SectionPrefsModal({ open, onClose }: Props) {
   const { enabled, advanced, dashboardOrder, toggle, toggleAdvanced, setDashboardOrder } = useSectionPrefs()
+  const { unit, setUnit } = useWeightUnit()
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 120, tolerance: 8 } }),
   )
 
-  function onDragEnd(event: DragEndEvent) {
+  const onDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event
     if (!over || active.id === over.id) return
 
@@ -148,7 +152,16 @@ export function SectionPrefsModal({ open, onClose }: Props) {
     if (oldIndex < 0 || newIndex < 0) return
 
     setDashboardOrder(arrayMove(dashboardOrder, oldIndex, newIndex) as SectionId[])
-  }
+  }, [dashboardOrder, setDashboardOrder])
+
+  // Stable callbacks per section — avoids new arrow fn per row per render
+  const toggleHandlers = useMemo(() =>
+    Object.fromEntries(dashboardOrder.map(id => [id, {
+      onToggle: () => toggle(id),
+      onToggleAdvanced: () => toggleAdvanced(id),
+    }])) as Record<SectionId, { onToggle: () => void; onToggleAdvanced: () => void }>,
+    [dashboardOrder, toggle, toggleAdvanced]
+  )
 
   return (
     <Modal open={open} onClose={onClose} title="Personalizar secciones">
@@ -160,23 +173,35 @@ export function SectionPrefsModal({ open, onClose }: Props) {
         </span>
       </div>
 
+      <div className="flex items-center justify-between px-1 mb-4">
+        <span className="text-[11px] font-bold text-white/40 uppercase tracking-widest">Unidad de peso</span>
+        <div className="flex bg-surface-200/50 rounded-xl p-0.5 border border-white/[0.04]">
+          {(['kg', 'lbs'] as const).map(u => (
+            <button
+              key={u}
+              onClick={() => setUnit(u)}
+              className={`px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider rounded-lg transition-colors ${
+                unit === u ? 'bg-accent/20 text-accent' : 'text-white/30 hover:text-white/60'
+              }`}
+            >{u}</button>
+          ))}
+        </div>
+      </div>
+
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
         <SortableContext items={dashboardOrder} strategy={verticalListSortingStrategy}>
           <div className="space-y-1.5">
-            {dashboardOrder.map(id => {
-              const def = SECTION_DEFS.find(s => s.id === id)!
-              return (
-                <SortableSectionRow
-                  key={id}
-                  id={id}
-                  enabled={enabled[id]}
-                  isAdvanced={advanced[id]}
-                  hasAdvanced={def.hasAdvanced}
-                  onToggle={() => toggle(id)}
-                  onToggleAdvanced={() => toggleAdvanced(id)}
-                />
-              )
-            })}
+            {dashboardOrder.map(id => (
+              <SortableSectionRow
+                key={id}
+                id={id}
+                enabled={enabled[id]}
+                isAdvanced={advanced[id]}
+                hasAdvanced={SECTION_MAP[id].hasAdvanced}
+                onToggle={toggleHandlers[id].onToggle}
+                onToggleAdvanced={toggleHandlers[id].onToggleAdvanced}
+              />
+            ))}
           </div>
         </SortableContext>
       </DndContext>

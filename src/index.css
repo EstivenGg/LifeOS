@@ -112,15 +112,19 @@
   }
 
   @media (max-width: 768px), (hover: none) and (pointer: coarse) {
-    * {
-      scrollbar-width: none;
-      -ms-overflow-style: none;
+    *,
+    html,
+    body {
+      scrollbar-width: none !important;
+      -ms-overflow-style: none !important;
     }
 
-    *::-webkit-scrollbar {
-      width: 0;
-      height: 0;
-      display: none;
+    *::-webkit-scrollbar,
+    html::-webkit-scrollbar,
+    body::-webkit-scrollbar {
+      width: 0 !important;
+      height: 0 !important;
+      display: none !important;
     }
   }
 

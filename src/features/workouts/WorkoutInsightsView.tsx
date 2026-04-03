@@ -8,7 +8,9 @@ import { Card, EmptyState } from '@/components/ui'
 import { Modal } from '@/components/ui/Modal'
 import { Activity, Dumbbell, Flame, Target, CalendarDays, TrendingUp, PieChart as PieIcon, Library, Search, Sparkles } from 'lucide-react'
 import type { EntryWorkout, ExerciseCatalog, Routine } from '@/data/types'
-import { parseDate, formatDate, today } from '@/utils/date'
+import { parseDate, formatDate, today, isDateString } from '@/utils/date'
+import { getSetTotalReps, getSetVolume } from '@/utils/workoutMetrics'
+import { useWeightUnit } from '@/context/SectionPrefsContext'
 import { ExerciseInsightPanel } from './ExerciseInsightPanel'
 import { WorkoutAutoInsights } from './WorkoutAutoInsights'
 
@@ -33,6 +35,32 @@ const tt = {
   },
 }
 
+function getRangeCutoff(range: DateRange) {
+  if (range === 'all') return null
+  const days = range === '30d' ? 30 : range === '90d' ? 90 : 182
+  const cutoff = parseDate(today())
+  cutoff.setDate(cutoff.getDate() - days)
+  return formatDate(cutoff)
+}
+
+function getWeekStart(dateStr: string) {
+  const d = parseDate(dateStr)
+  const day = d.getDay()
+  const diff = day === 0 ? -6 : 1 - day
+  d.setDate(d.getDate() + diff)
+  return formatDate(d)
+}
+
+function formatWeekRange(weekStartStr: string) {
+  const start = parseDate(weekStartStr)
+  const end = parseDate(weekStartStr)
+  end.setDate(end.getDate() + 6)
+
+  const startLabel = start.toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })
+  const endLabel = end.toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })
+  return `${startLabel} - ${endLabel}`
+}
+
 interface Props {
   weekSets: { label: string; sets: number }[]
   allWorkouts: EntryWorkout[]
@@ -42,10 +70,24 @@ interface Props {
 }
 
 export function WorkoutInsightsView({ allWorkouts, catalog, routines, dailyEntries }: Props) {
+  const { unit, kgToDisplay } = useWeightUnit()
   const [chartTab, setChartTab] = useState<TabId>('weeks')
   const [weekMetric, setWeekMetric] = useState<WeekMetric>('sets')
   const [dateRange, setDateRange] = useState<DateRange>('all')
   const [insightsOpen, setInsightsOpen] = useState(false)
+  const datedWorkouts = useMemo(
+    () => allWorkouts.filter(w => isDateString(w.entryDate)),
+    [allWorkouts]
+  )
+
+  // Dates with workoutDone=true (basic mode) that have no EntryWorkout record
+  const basicOnlyDates = useMemo(() => {
+    const advancedSet = new Set(datedWorkouts.map(w => w.entryDate))
+    return dailyEntries
+      .filter(de => de.workoutDone && isDateString(de.date) && !advancedSet.has(de.date))
+      .map(de => de.date)
+  }, [dailyEntries, datedWorkouts])
+  const hasInsightData = datedWorkouts.length > 0 || basicOnlyDates.length > 0
 
   // ── Stat calculations (always all-time) ──
   const stats = useMemo(() => {
@@ -54,18 +96,19 @@ export function WorkoutInsightsView({ allWorkouts, catalog, routines, dailyEntri
     let totalVolume = 0
     const workoutDates = new Set<string>()
 
-    allWorkouts.forEach(w => {
+    datedWorkouts.forEach(w => {
       workoutDates.add(w.entryDate)
       w.exercises?.forEach(ex => {
         ex.sets?.forEach(s => {
           totalSets++
-          totalReps += s.reps || 0
-          if (s.weight && s.reps) {
-            totalVolume += s.reps * s.weight
-          }
+          totalReps += getSetTotalReps(s, ex)
+          totalVolume += getSetVolume(s, ex)
         })
       })
     })
+
+    // Include basic-mode workout days in date-based stats
+    basicOnlyDates.forEach(d => workoutDates.add(d))
 
     const t = today()
     let streak = 0
@@ -96,7 +139,7 @@ export function WorkoutInsightsView({ allWorkouts, catalog, routines, dailyEntri
     })
 
     return {
-      sessions: allWorkouts.length,
+      sessions: datedWorkouts.length + basicOnlyDates.length,
       totalSets,
       totalReps,
       totalVolume,
@@ -105,57 +148,55 @@ export function WorkoutInsightsView({ allWorkouts, catalog, routines, dailyEntri
       days30,
       days90
     }
-  }, [allWorkouts])
+  }, [datedWorkouts, basicOnlyDates])
 
   // ── Filtered workouts by date range ──
+  const cutoffDate = useMemo(() => getRangeCutoff(dateRange), [dateRange])
+
   const filteredWorkouts = useMemo(() => {
-    if (dateRange === 'all') return allWorkouts
-    const days = dateRange === '30d' ? 30 : dateRange === '90d' ? 90 : 182
-    const cutoff = new Date()
-    cutoff.setDate(cutoff.getDate() - days)
-    return allWorkouts.filter(w => parseDate(w.entryDate) >= cutoff)
-  }, [allWorkouts, dateRange])
+    if (!cutoffDate) return datedWorkouts
+    return datedWorkouts.filter(w => w.entryDate >= cutoffDate)
+  }, [datedWorkouts, cutoffDate])
 
   // ── Weekly Chart Data ──
   const weeklyData = useMemo(() => {
     const wks: Record<string, { sets: number, volume: number, sessions: number }> = {}
 
-    const getWeekStr = (dateStr: string) => {
-      const d = parseDate(dateStr)
-      const day = d.getDay()
-      const diff = day === 0 ? -6 : 1 - day
-      d.setDate(d.getDate() + diff)
-      return formatDate(d)
-    }
-
     filteredWorkouts.forEach(w => {
-       const ws = getWeekStr(w.entryDate)
+       const ws = getWeekStart(w.entryDate)
        if (!wks[ws]) wks[ws] = { sets: 0, volume: 0, sessions: 0 }
 
        wks[ws].sessions += 1
        w.exercises?.forEach(ex => {
          ex.sets?.forEach(s => {
            wks[ws].sets += 1
-           if (s.weight && s.reps) {
-             wks[ws].volume += s.reps * s.weight
-           }
+           wks[ws].volume += getSetVolume(s, ex)
          })
        })
     })
 
-    const result: { label: string; sets: number; volume: number; sessions: number }[] = []
+    // Also count basic-mode workout days (workoutDone=true, no EntryWorkout)
+    basicOnlyDates.forEach(dateStr => {
+      if (cutoffDate && dateStr < cutoffDate) return
+      const ws = getWeekStart(dateStr)
+      if (!wks[ws]) wks[ws] = { sets: 0, volume: 0, sessions: 0 }
+      wks[ws].sessions += 1
+    })
+
+    const currentWeekStart = getWeekStart(today())
+    const result: { label: string; weekLabel: string; sets: number; volume: number; sessions: number }[] = []
     for (let i = 7; i >= 0; i--) {
-      const d = new Date()
-      const day = d.getDay()
-      const diff = day === 0 ? -6 : 1 - day
-      d.setDate(d.getDate() + diff - i * 7)
-      const labelStr = formatDate(d)
-      const dayStr = parseDate(labelStr).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })
-      const val = wks[labelStr] || { sets: 0, volume: 0, sessions: 0 }
-      result.push({ label: dayStr, ...val })
+      const d = parseDate(currentWeekStart)
+      d.setDate(d.getDate() - i * 7)
+      const weekStartStr = formatDate(d)
+      const label = weekStartStr === currentWeekStart
+        ? 'Esta sem.'
+        : parseDate(weekStartStr).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })
+      const val = wks[weekStartStr] || { sets: 0, volume: 0, sessions: 0 }
+      result.push({ label, weekLabel: formatWeekRange(weekStartStr), ...val })
     }
     return result
-  }, [filteredWorkouts])
+  }, [filteredWorkouts, basicOnlyDates, cutoffDate])
 
   // ── Exercise Freq ──
   const topExercises = useMemo(() => {
@@ -168,16 +209,19 @@ export function WorkoutInsightsView({ allWorkouts, catalog, routines, dailyEntri
 
   // ── Routine Freq ──
   const topRoutines = useMemo(() => {
-    const freq: Record<number, number> = {}
+    const freq: Record<number, { count: number; name: string }> = {}
     filteredWorkouts.forEach(w => {
        if (w.routineId) {
-          freq[w.routineId] = (freq[w.routineId] || 0) + 1
+          const current = freq[w.routineId] || { count: 0, name: w.routineName || '' }
+          current.count += 1
+          current.name = w.routineName || current.name
+          freq[w.routineId] = current
        }
     })
-    return Object.entries(freq).sort((a,b) => b[1] - a[1]).slice(0, 8).map(x => {
-       const rId = parseInt(x[0])
+    return Object.entries(freq).sort((a,b) => b[1].count - a[1].count).slice(0, 8).map(x => {
+       const rId = parseInt(x[0], 10)
        const routine = routines.find(r => r.id === rId)
-       return { name: routine?.name || 'Rutina eliminada', freq: x[1] }
+       return { name: x[1].name || routine?.name || 'Rutina eliminada', freq: x[1].count }
     })
   }, [filteredWorkouts, routines])
 
@@ -188,7 +232,7 @@ export function WorkoutInsightsView({ allWorkouts, catalog, routines, dailyEntri
 
     filteredWorkouts.forEach(w => {
        w.exercises?.forEach(e => {
-          const mg = e.exerciseCatalogId ? (catMap.get(e.exerciseCatalogId) || 'Otros') : 'Otros'
+          const mg = e.muscleGroup || (e.exerciseCatalogId ? (catMap.get(e.exerciseCatalogId) || 'Otros') : 'Otros')
           const setsCount = e.sets?.length || 0
           mFreq[mg] = (mFreq[mg] || 0) + setsCount
        })
@@ -203,12 +247,18 @@ export function WorkoutInsightsView({ allWorkouts, catalog, routines, dailyEntri
     }))
   }, [filteredWorkouts, catalog])
 
+  const displayTotalVolume = kgToDisplay(stats.totalVolume)
+  const displayWeeklyData = useMemo(() =>
+    weeklyData.map(d => ({ ...d, volume: Math.round(kgToDisplay(d.volume) * 10) / 10 })),
+    [weeklyData, kgToDisplay]
+  )
+
   // Layout structures
   const kpiItems = [
     { label: 'Sesiones', value: stats.sessions, icon: <Activity size={16} className="text-blue-400" />, bg: 'bg-blue-500/10' },
     { label: 'Racha', value: `${stats.streak}d`, icon: <Flame size={16} className="text-orange-500" />, bg: 'bg-orange-500/10' },
     { label: 'Sets', value: stats.totalSets, icon: <Dumbbell size={16} className="text-emerald-400" />, bg: 'bg-emerald-500/10' },
-    { label: 'Volumen', value: `${stats.totalVolume > 1000 ? (stats.totalVolume/1000).toFixed(1)+'k' : stats.totalVolume} kg`, icon: <Target size={16} className="text-purple-400" />, bg: 'bg-purple-500/10' }
+    { label: 'Volumen', value: `${displayTotalVolume > 1000 ? (displayTotalVolume/1000).toFixed(1)+'k' : displayTotalVolume} ${unit}`, icon: <Target size={16} className="text-purple-400" />, bg: 'bg-purple-500/10' }
   ]
 
   const chartTabs = [
@@ -219,7 +269,7 @@ export function WorkoutInsightsView({ allWorkouts, catalog, routines, dailyEntri
     { id: 'exercise' as const, label: 'Por ejercicio', icon: <Search size={12} /> },
   ]
 
-  if (allWorkouts.length === 0) {
+  if (!hasInsightData) {
     return (
       <EmptyState
         icon={<Activity size={40} />}
@@ -282,7 +332,7 @@ export function WorkoutInsightsView({ allWorkouts, catalog, routines, dailyEntri
                 <button
                   key={r.key}
                   onClick={() => setDateRange(r.key)}
-                  className={`px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider rounded-lg transition-all ${
+                  className={`px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider rounded-lg transition-colors ${
                     dateRange === r.key
                       ? 'bg-accent/20 text-accent'
                       : 'text-white/30 hover:text-white/60'
@@ -292,7 +342,7 @@ export function WorkoutInsightsView({ allWorkouts, catalog, routines, dailyEntri
             </div>
             <button
               onClick={() => setInsightsOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold rounded-xl bg-amber-400/10 text-amber-400/80 border border-amber-400/15 hover:bg-amber-400/20 transition-all shrink-0"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold rounded-xl bg-amber-400/10 text-amber-400/80 border border-amber-400/15 hover:bg-amber-400/20 transition-colors shrink-0"
             >
               <Sparkles size={12} />
               <span className="hidden sm:inline">Insights</span>
@@ -304,12 +354,12 @@ export function WorkoutInsightsView({ allWorkouts, catalog, routines, dailyEntri
       {/* ── Chart Tabs (scrollable on mobile) ── */}
       <div className="overflow-x-auto scrollbar-none -mx-1 px-1">
         <div className="flex justify-center min-w-min">
-          <div className="inline-flex items-center gap-0.5 bg-surface-100/60 backdrop-blur-xl rounded-2xl p-1 border border-white/[0.05]">
+          <div className="inline-flex items-center gap-0.5 bg-surface-100/80 rounded-2xl p-1 border border-white/[0.05]">
             {chartTabs.map(tab => (
               <button
                 key={tab.id}
                 onClick={() => setChartTab(tab.id)}
-                className={`flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1.5 rounded-xl transition-all whitespace-nowrap shrink-0 ${
+                className={`flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1.5 rounded-xl transition-colors whitespace-nowrap shrink-0 ${
                   chartTab === tab.id
                     ? 'bg-accent/15 text-accent shadow-sm shadow-accent/10'
                     : 'text-white/35 hover:bg-surface-200/60 hover:text-white/60'
@@ -324,7 +374,7 @@ export function WorkoutInsightsView({ allWorkouts, catalog, routines, dailyEntri
 
       {/* ── Chart Content ── */}
       {chartTab === 'exercise' ? (
-        <ExerciseInsightPanel allWorkouts={allWorkouts} catalog={catalog} dailyEntries={dailyEntries} />
+        <ExerciseInsightPanel allWorkouts={datedWorkouts} catalog={catalog} dailyEntries={dailyEntries} />
       ) : (
         <Card className="min-h-[200px] p-4">
           <AnimatePresence mode="wait">
@@ -340,7 +390,10 @@ export function WorkoutInsightsView({ allWorkouts, catalog, routines, dailyEntri
               {chartTab === 'weeks' && (
                 <>
                   <div className="flex items-center justify-between mb-4 gap-2">
-                    <p className="text-xs text-white/40 font-medium">Evolución semanal</p>
+                    <div>
+                      <p className="text-xs text-white/40 font-medium">Evolución semanal</p>
+                      <p className="text-[10px] text-white/25 mt-0.5">Cada barra agrupa de lunes a domingo</p>
+                    </div>
                     <div className="flex bg-surface-200/60 rounded-md p-0.5">
                       {([
                         { key: 'sets', label: 'Sets' },
@@ -360,18 +413,18 @@ export function WorkoutInsightsView({ allWorkouts, catalog, routines, dailyEntri
                     </div>
                   </div>
 
-                  {weeklyData.some(d => d[weekMetric] > 0) ? (
+                  {(weekMetric === 'volume' ? displayWeeklyData : weeklyData).some(d => d[weekMetric] > 0) ? (
                     <ResponsiveContainer width="100%" height={180}>
-                      <BarChart data={weeklyData}>
+                      <BarChart data={weekMetric === 'volume' ? displayWeeklyData : weeklyData}>
                         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.04)" vertical={false} />
                         <XAxis dataKey="label" tick={{ fontSize: 9, fill: 'rgba(255,255,255,.25)' }} axisLine={false} tickLine={false} />
                         <YAxis tick={{ fontSize: 9, fill: 'rgba(255,255,255,.25)' }} width={28} axisLine={false} tickLine={false} />
-                        <Tooltip {...tt} />
+                        <Tooltip {...tt} labelFormatter={(_, payload) => payload?.[0]?.payload?.weekLabel ?? _} />
                         <Bar
                           dataKey={weekMetric}
                           fill={weekMetric === 'volume' ? '#a855f7' : '#f97316'}
                           radius={[4, 4, 0, 0]}
-                          name={weekMetric === 'sets' ? 'Sets' : weekMetric === 'volume' ? 'KG' : 'Sesiones'}
+                          name={weekMetric === 'sets' ? 'Sets' : weekMetric === 'volume' ? unit.toUpperCase() : 'Sesiones'}
                         />
                       </BarChart>
                     </ResponsiveContainer>
@@ -422,7 +475,7 @@ export function WorkoutInsightsView({ allWorkouts, catalog, routines, dailyEntri
                     {list.length > 0 ? (
                       <div className="space-y-1.5 overflow-hidden">
                         {list.map((item, i) => (
-                          <div key={item.name} className="glass-card flex items-center gap-3 px-3 py-2.5 transition-all hover:bg-surface-200/80">
+                          <div key={item.name} className="glass-card flex items-center gap-3 px-3 py-2.5 transition-colors hover:bg-surface-200/80">
                             <span className={`text-[11px] font-black w-5 text-center shrink-0 ${
                               i === 0 ? 'text-amber-400' :
                               i === 1 ? 'text-slate-300' :
@@ -450,7 +503,7 @@ export function WorkoutInsightsView({ allWorkouts, catalog, routines, dailyEntri
 
       {/* ── Insights Modal ── */}
       <Modal open={insightsOpen} onClose={() => setInsightsOpen(false)} title="Insights automáticos" size="md">
-        <WorkoutAutoInsights allWorkouts={allWorkouts} catalog={catalog} routines={routines} />
+        <WorkoutAutoInsights allWorkouts={datedWorkouts} catalog={catalog} routines={routines} />
       </Modal>
 
     </div>

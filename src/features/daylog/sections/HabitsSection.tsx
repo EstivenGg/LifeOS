@@ -43,16 +43,15 @@ function ProgressRing({ done, total, size = 48 }: { done: number; total: number;
 
 function HabitChip({ habit, done, onToggle }: { habit: T.Habit; done: boolean; onToggle: () => void }) {
   return (
-    <motion.button
-      whileTap={{ scale: 0.93 }}
+    <button
       onClick={onToggle}
-      className={`flex items-center gap-2.5 px-3 py-3 rounded-2xl transition-all duration-300 border text-left ${
+      className={`flex items-center gap-2.5 px-3 py-3 rounded-2xl transition-colors duration-300 border text-left active:scale-90 ${
         done
           ? 'bg-accent/10 border-accent/25 shadow-[inset_0_0_10px_rgb(var(--accent)/0.08)]'
           : 'bg-surface-200/40 border-white/5 hover:border-white/10 hover:bg-surface-300/40'
       }`}
     >
-      <div className={`shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-300 ${
+      <div className={`shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors duration-300 ${
         done ? 'bg-accent border-accent shadow-[0_0_10px_rgb(var(--accent)/0.5)]' : 'border-white/20 bg-surface-100/50'
       }`}>
         <AnimatePresence>
@@ -71,7 +70,7 @@ function HabitChip({ habit, done, onToggle }: { habit: T.Habit; done: boolean; o
       <span className={`text-xs font-bold truncate leading-tight transition-colors duration-300 ${done ? 'text-white' : 'text-white/55'}`}>
         {habit.name}
       </span>
-    </motion.button>
+    </button>
   )
 }
 
@@ -83,13 +82,9 @@ export function HabitsSection({ habits, categories, entryHabits, doneCount, isHo
 
   const EmptyState = (
     <div className="flex flex-col items-center justify-center h-full min-h-[160px] text-center">
-      <motion.div
-        animate={{ scale: [1, 1.05, 1], opacity: [0.2, 0.35, 0.2] }}
-        transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-        className="w-12 h-12 rounded-full bg-surface-200/50 flex items-center justify-center mx-auto mb-3"
-      >
+      <div className="w-12 h-12 rounded-full bg-surface-200/50 flex items-center justify-center mx-auto mb-3 opacity-30">
         <CheckCircle2 size={24} className="text-white/20" />
-      </motion.div>
+      </div>
       <p className="text-sm text-white/40 mb-3">Sin hábitos activos.</p>
       <button onClick={onNavigateToHabits} className="btn-ghost scale-95 border border-white/5 bg-surface-200/40 text-xs px-4 py-2">
         Configurar Hábitos
@@ -136,17 +131,16 @@ export function HabitsSection({ habits, categories, entryHabits, doneCount, isHo
                       {catHabits.map(h => {
                         const done = entryHabits.find(eh => eh.habitId === h.id!)?.done || false
                         return (
-                          <motion.button
+                          <button
                             key={h.id}
-                            whileTap={{ scale: 0.96 }}
                             onClick={() => onToggle(h.id!)}
-                            className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-[18px] transition-all duration-300 border ${
+                            className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-[18px] transition-colors duration-300 border active:scale-95 ${
                               done
                                 ? 'bg-accent/10 border-accent/20 shadow-[inset_0_0_12px_rgb(var(--accent)/0.08)]'
                                 : 'bg-surface-200/40 border-white/5 hover:border-white/10 hover:bg-surface-300/40'
                             }`}
                           >
-                            <div className={`shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all duration-300 ${
+                            <div className={`shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors duration-300 ${
                               done ? 'bg-accent border-accent shadow-[0_0_12px_rgb(var(--accent)/0.5)]' : 'border-white/20 bg-surface-100/50'
                             }`}>
                               <motion.div
@@ -160,7 +154,7 @@ export function HabitsSection({ habits, categories, entryHabits, doneCount, isHo
                             <span className={`text-[15px] sm:text-base font-medium truncate transition-colors duration-300 ${done ? 'text-white' : 'text-white/60'}`}>
                               {h.name}
                             </span>
-                          </motion.button>
+                          </button>
                         )
                       })}
                     </div>

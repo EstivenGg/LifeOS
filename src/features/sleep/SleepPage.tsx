@@ -1,5 +1,4 @@
 import { useState, useEffect, useMemo } from 'react'
-import { motion } from 'framer-motion'
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
   LineChart, Line, ReferenceLine,
@@ -276,17 +275,16 @@ export function SleepPage() {
               {hasSchedule && (
                 <div className="flex bg-surface-200/40 rounded-lg p-0.5 border border-white/[0.04] shrink-0">
                   {(['hours', 'schedule'] as const).map(tab => (
-                    <motion.button
+                    <button
                       key={tab}
-                      whileTap={{ scale: 0.95 }}
                       onClick={() => setChartTab(tab)}
-                      className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${chartTab === tab
+                      className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors active:scale-95 ${chartTab === tab
                           ? 'bg-accent/15 text-accent'
                           : 'text-white/30 hover:text-white/50'
                         }`}
                     >
                       {tab === 'hours' ? 'Horas' : 'Horario'}
-                    </motion.button>
+                    </button>
                   ))}
                 </div>
               )}

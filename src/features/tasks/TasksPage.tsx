@@ -396,16 +396,13 @@ export function TasksPage() {
 
   const completeList = async (l: TaskList) => {
     const listTasks = tasks.filter(task => task.listId === l.id)
-    for (const task of listTasks) {
-      await db.tasks.update(task.id!, {
+    await Promise.all([
+      ...listTasks.map(task => db.tasks.update(task.id!, {
         status: 'completed',
         completedAt: task.completedAt ?? now(),
-      })
-    }
-
-    await db.taskLists.update(l.id!, {
-      completedAt: now(),
-    })
+      })),
+      db.taskLists.update(l.id!, { completedAt: now() }),
+    ])
 
     setCompletionVisibility('all')
     await load()
@@ -483,7 +480,7 @@ export function TasksPage() {
 
   const executeDeleteList = async (id: number) => {
     const tasksInList = tasks.filter(t => t.listId === id)
-    for (const t of tasksInList) await db.tasks.update(t.id!, { listId: undefined })
+    await Promise.all(tasksInList.map(t => db.tasks.update(t.id!, { listId: undefined })))
     await db.taskLists.delete(id)
     if (selectedListId === id) setSelectedListId(null)
     setConfirmDelete(null)
@@ -526,9 +523,7 @@ export function TasksPage() {
   const applyListDueDateToTasks = async (listId: number, dueDate?: string) => {
     if (!dueDate) return
     const listTasks = tasks.filter(task => task.listId === listId && !task.dueDate)
-    for (const task of listTasks) {
-      await db.tasks.update(task.id!, { dueDate })
-    }
+    await Promise.all(listTasks.map(task => db.tasks.update(task.id!, { dueDate })))
   }
 
   const parseTags = (tags?: string): string[] => {
@@ -587,7 +582,7 @@ export function TasksPage() {
       </div>
 
       <div className="mb-6 flex justify-center">
-        <div className="flex p-1 bg-surface-100/60 rounded-xl shrink-0 backdrop-blur-md border border-white/[0.05]">
+        <div className="flex p-1 bg-surface-100/80 rounded-xl shrink-0 border border-white/[0.05]">
           {([
             { key: 'tasks' as ViewTab, label: 'Bandeja', icon: ListTodo },
             { key: 'lists' as ViewTab, label: 'Listas', icon: FolderOpen },
@@ -598,7 +593,7 @@ export function TasksPage() {
                 setTab(view.key)
                 setSelectedListId(null)
               }}
-              className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-all ${
+              className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-colors ${
                 tab === view.key
                   ? 'bg-accent text-white shadow-lg shadow-accent/20'
                   : 'text-white/40 hover:bg-white/5 hover:text-white/80'
@@ -624,7 +619,7 @@ export function TasksPage() {
                   <button
                     key={view.key}
                     onClick={() => setCompletionVisibility(view.key)}
-                    className={`px-4 py-1.5 rounded-md text-[13px] font-semibold transition-all ${
+                    className={`px-4 py-1.5 rounded-md text-[13px] font-semibold transition-colors ${
                       completionVisibility === view.key
                         ? 'bg-white/10 text-white shadow-sm'
                         : 'text-white/30 hover:text-white/60'
@@ -639,7 +634,7 @@ export function TasksPage() {
 
               <button
                 onClick={() => setShowFilters(true)}
-                className="w-8 h-8 rounded-md flex items-center justify-center text-white/50 hover:bg-white/10 hover:text-white/90 transition-all relative"
+                className="w-8 h-8 rounded-md flex items-center justify-center text-white/50 hover:bg-white/10 hover:text-white/90 transition-colors relative"
                 title="Filtrar y Ordenar"
               >
                 <SlidersHorizontal size={15} />
@@ -749,7 +744,7 @@ export function TasksPage() {
                       setSelectedListId(l.id!)
                       setCompletionVisibility(l.completedAt ? 'all' : 'active')
                     }}
-                    className={`w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs font-medium transition-all text-left ${
+                    className={`w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs font-medium transition-colors text-left ${
                       selectedListId === l.id ? 'bg-accent/10 text-accent' : 'text-white/50 hover:bg-surface-200/40'
                     }`}
                   >
@@ -761,7 +756,7 @@ export function TasksPage() {
                     </span>
                   </button>
                 ))}
-                <button onClick={openNewList} className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs text-white/30 hover:text-white/50 hover:bg-surface-200/40 transition-all">
+                <button onClick={openNewList} className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs text-white/30 hover:text-white/50 hover:bg-surface-200/40 transition-colors">
                   <Plus size={14} /> Crear lista
                 </button>
               </Card>
@@ -993,7 +988,7 @@ export function TasksPage() {
             <div className="flex gap-2.5 mt-1 flex-wrap">
               {LIST_COLORS.map(c => (
                 <button key={c} onClick={() => setListForm({ ...listForm, color: c })}
-                  className={`w-8 h-8 rounded-full transition-all ${listForm.color === c ? 'ring-2 ring-white/50 ring-offset-2 ring-offset-surface-100 scale-110' : 'hover:scale-105 opacity-70 hover:opacity-100'}`}
+                  className={`w-8 h-8 rounded-full transition-transform ${listForm.color === c ? 'ring-2 ring-white/50 ring-offset-2 ring-offset-surface-100 scale-110' : 'hover:scale-105 opacity-70 hover:opacity-100'}`}
                   style={{ backgroundColor: c }} />
               ))}
             </div>
@@ -1071,7 +1066,7 @@ export function TasksPage() {
                 <button
                   key={opt.value}
                   onClick={() => setSortMode(opt.value as SortMode)}
-                  className={`px-3 py-2.5 rounded-xl text-sm font-semibold transition-all text-center ${
+                  className={`px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors text-center ${
                     sortMode === opt.value
                       ? 'bg-accent text-white shadow-md shadow-accent/20'
                       : 'bg-surface-100/50 text-white/50 hover:bg-surface-200 hover:text-white/70'
@@ -1094,7 +1089,7 @@ export function TasksPage() {
                     <button
                       key={opt.value}
                       onClick={() => setTaskFocusFilter(opt.value as TaskFocusFilter)}
-                      className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                      className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-colors ${
                         active
                           ? 'bg-accent/20 text-accent ring-1 ring-accent/30'
                           : 'bg-surface-100/50 text-white/50 hover:bg-surface-200/50'

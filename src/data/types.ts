@@ -40,16 +40,31 @@ export interface ExerciseCatalog {
   id?: number
   name: string
   muscleGroup: string
+  trackingMode?: ExerciseTrackingMode
+  loadMode?: ExerciseLoadMode
 }
 
 // ─── Routines ───
-export interface Routine { id?: number; name: string }
+export interface Routine {
+  id?: number
+  name: string
+  objective?: string          // Propósito o contexto de la rutina
+  estimatedDuration?: number  // Duración estimada en minutos
+  timeOfDay?: string          // Momento recomendado: "morning" | "afternoon" | "evening"
+  notes?: string              // Notas generales de la rutina
+}
+
 export interface RoutineExercise {
   id?: number
   routineId: number
   exerciseCatalogId: number
   name: string
   sortOrder: number
+  setsPlanned: number         // Cantidad de series esperadas
+  repsTarget: string          // "8-12", "10", "6-8", etc
+  restBetweenSets?: number    // Descanso entre series en segundos
+  restAfterExercise?: number  // Descanso después del ejercicio en segundos
+  notes?: string              // Notas e instrucciones para este ejercicio
 }
 
 // ─── Media (Series & Películas) ───
@@ -125,9 +140,21 @@ export interface EntryReading {
   note?: string
 }
 
+export type WorkoutSide = 'left' | 'right'
+export type ExerciseTrackingMode = 'standard' | 'unilateral'
+export type ExerciseLoadMode = 'total' | 'per_hand' | 'per_side'
+
+export interface WorkoutSetSideEntry {
+  reps?: number
+  weight?: number
+  rpe?: number
+  nextWeight?: number
+}
+
 export interface WorkoutSetEntry {
   reps: number
   weight?: number
+  sides?: Partial<Record<WorkoutSide, WorkoutSetSideEntry>>
   rpe?: number       // legacy, kept for old data
   nextWeight?: number // peso sugerido para la próxima vez
 }
@@ -135,7 +162,14 @@ export interface WorkoutSetEntry {
 export interface EntryWorkoutExercise {
   exerciseCatalogId: number
   exerciseName: string
+  muscleGroup?: string
+  trackingMode?: ExerciseTrackingMode
+  loadMode?: ExerciseLoadMode
   sets: WorkoutSetEntry[]
+  // Fase 5: snapshot del plan al momento de la ejecución
+  setsPlanned?: number      // cuántos sets tenía planeado hacer
+  repsTarget?: string       // "8-12", "10", etc.
+  restBetweenSets?: number  // segundos — descanso configurado ese día
 }
 
 export type PhysicalActivityType = 'gym' | 'running' | 'swimming' | 'cycling' | 'hiking' | 'walking' | 'sports' | 'other'
@@ -144,6 +178,7 @@ export interface EntryWorkout {
   id?: number
   entryDate: string
   routineId?: number // Optional for non-gym activities
+  routineName?: string
 
   // Multi-sport extension
   type?: PhysicalActivityType // Undefined means it's a legacy 'gym' entry
@@ -165,6 +200,10 @@ export interface EntryWorkout {
 
   // Existing gym exercises
   exercises: EntryWorkoutExercise[]
+
+  // Fase 5: duración real de la sesión
+  startedAt?: string   // ISO string — cuando el usuario tocó "Comenzar"
+  finishedAt?: string  // ISO string — cuando se guardó la sesión
 }
 
 export interface EntryAppUsage {

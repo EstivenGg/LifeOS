@@ -297,7 +297,7 @@ export function BooksPage() {
           <button
             key={s}
             onClick={() => setFilterStatus(s)}
-            className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-all ${filterStatus === s ? 'bg-accent/15 text-accent' : 'text-white/30 hover:text-white/50'
+            className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${filterStatus === s ? 'bg-accent/15 text-accent' : 'text-white/30 hover:text-white/50'
               }`}
           >
             {s === 'all' ? 'Todos' : s === 'reading' ? 'Leyendo' : s === 'paused' ? 'Pausado' : 'Terminado'}
@@ -365,18 +365,20 @@ export function BooksPage() {
   )
 
   return (
-    <div className="max-w-6xl mx-auto pb-6">
+    <div className="max-w-6xl mx-auto">
 
       {/* Header */}
       <div className="mb-5">
         <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-accent/15 border border-accent/20 flex items-center justify-center shadow-[0_0_20px_rgb(var(--accent)/0.15)]">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-2xl bg-accent/15 border border-accent/20 flex items-center justify-center shadow-[0_0_20px_rgb(var(--accent)/0.15)] shrink-0">
               <BookOpen size={20} className="text-accent" />
             </div>
-            <div>
+            <div className="min-w-0">
               <h1 className="text-xl md:text-2xl font-bold">Biblioteca</h1>
-              <p className="text-xs text-white/30 mt-0.5">Libros · autores · progreso</p>
+              <p className="text-xs text-white/30 mt-0.5">
+                {view === 'list' ? 'Libros · autores · progreso' : 'Tendencias y estadísticas'}
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -386,12 +388,14 @@ export function BooksPage() {
                 className={`btn-secondary text-xs flex items-center gap-1.5 ${view === 'stats' ? 'bg-accent/15 text-accent border-accent/30' : ''}`}
               >
                 <BarChart2 size={13} />
-                <span className="hidden sm:inline">{view === 'stats' ? 'Lista' : 'Stats'}</span>
+                <span className="hidden sm:inline">{view === 'stats' ? 'Lista' : 'Insights'}</span>
               </button>
             )}
-            <button onClick={openNew} className="btn-primary text-xs">
-              <Plus size={14} /> <span className="hidden sm:inline">Nuevo libro</span><span className="sm:hidden">Nuevo</span>
-            </button>
+            {view === 'list' && (
+              <button onClick={openNew} className="btn-primary text-xs flex items-center gap-1">
+                <Plus size={14} /> Nuevo
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -407,48 +411,128 @@ export function BooksPage() {
           {/* ── LIST VIEW ─────────────────────────────────────────── */}
           {view === 'list' && (
             <>
-              {/* Quick strip with scroll snapping */}
-              {(readingNow.length > 0 || lastFinished) && (
-                <div className="flex gap-3 mb-5 overflow-x-auto pb-1 snap-x snap-mandatory scroll-pl-1">
-                  {readingNow.map(b => {
-                    const author = authorsById.get(b.authorId)
-                    const read = pagesPerBook[b.id!] || 0
-                    const pct = b.totalPages > 0 ? Math.min(Math.round((read / b.totalPages) * 100), 100) : 0
-                    return (
-                      <div
-                        key={b.id}
-                        onClick={() => setDetailBook(b)}
-                        className="glass-card-hover p-3 min-w-[175px] cursor-pointer flex-shrink-0 snap-start active:scale-[0.97] transition-transform focus-visible:ring-2 focus-visible:ring-accent/40"
-                      >
-                        <p className="text-[9px] text-emerald-400 mb-1">📖 Leyendo</p>
-                        <p className="text-sm font-medium truncate">{b.title}</p>
-                        {author && <p className="text-[10px] text-white/30 truncate">{author.name}</p>}
-                        <div className="flex items-center gap-2 mt-1.5">
-                          <ProgressBar value={read} max={b.totalPages} color="bg-emerald-400" height="h-1" />
-                          <span className="text-[9px] text-white/25 font-mono flex-shrink-0">{pct}%</span>
+              {/* Hero card */}
+              {books.length > 0 && (() => {
+                const readingCount = books.filter(b => b.status === 'reading').length
+                const finishedCount = books.filter(b => b.status === 'finished').length
+                const pausedCount = books.filter(b => b.status === 'paused').length
+                const totalPagesRead = Object.values(pagesPerBook).reduce((s, n) => s + n, 0)
+                const finishedPct = books.length > 0 ? Math.round((finishedCount / books.length) * 100) : 0
+                return (
+                  <>
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.35 }}
+                      className="glass-card !bg-gradient-to-br from-accent/8 via-transparent to-transparent border-accent/10 p-4 mb-5"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-[10px] text-white/30 uppercase tracking-widest font-semibold mb-1">Biblioteca</p>
+                          <p className="text-3xl md:text-4xl font-black tabular-nums font-mono">
+                            {books.length}
+                          </p>
+                          <p className="text-[11px] text-white/25 mt-1">
+                            {finishedCount} terminados · {readingCount} leyendo · {totalPagesRead.toLocaleString()} páginas
+                          </p>
+                        </div>
+                        <div className="flex flex-col items-end gap-1.5">
+                          <div className={`flex items-center gap-1.5 text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                            finishedPct >= 60 ? 'text-emerald-400/70 bg-emerald-500/10'
+                              : finishedPct >= 30 ? 'text-amber-400/70 bg-amber-500/10'
+                                : 'text-white/30 bg-surface-200/50'
+                          }`}>
+                            <CheckCircle2 size={11} />
+                            {finishedPct}% completado
+                          </div>
+                          {stats.weekPages > 0 && (
+                            <div className="flex items-center gap-1.5 text-[10px] text-accent/70 bg-accent/10 px-2 py-0.5 rounded-full font-medium">
+                              <FileText size={11} />
+                              {stats.weekPages} p. esta semana
+                            </div>
+                          )}
                         </div>
                       </div>
-                    )
-                  })}
-                  {lastFinished && (
-                    <div
-                      onClick={() => setDetailBook(lastFinished)}
-                      className="glass-card-hover p-3 min-w-[175px] cursor-pointer flex-shrink-0 snap-start active:scale-[0.97] transition-transform focus-visible:ring-2 focus-visible:ring-accent/40"
-                    >
-                      <p className="text-[9px] text-accent mb-1">✓ Último terminado</p>
-                      <p className="text-sm font-medium truncate">{lastFinished.title}</p>
-                      <p className="text-[10px] text-white/30 truncate">
-                        {authorsById.get(lastFinished.authorId)?.name}
-                      </p>
-                      {lastFinished.rating && (
-                        <div className="flex mt-1">
-                          {Array.from({ length: 5 }, (_, i) => (
-                            <Star key={i} size={8} className={i < lastFinished.rating! ? 'text-amber-400 fill-amber-400' : 'text-white/10'} />
-                          ))}
+                    </motion.div>
+
+                    {/* Quick stats */}
+                    <div className="flex items-center justify-center gap-5 mb-5 py-2">
+                      <div className="text-center">
+                        <div className="flex items-center justify-center gap-1 mb-0.5">
+                          <CheckCircle2 size={13} className="text-accent" />
+                          <p className="text-xl font-bold font-mono">{finishedCount}</p>
                         </div>
+                        <p className="text-[9px] uppercase tracking-widest text-white/30 font-semibold">Terminados</p>
+                      </div>
+                      <div className="w-px h-8 bg-white/[0.06]" />
+                      <div className="text-center">
+                        <div className="flex items-center justify-center gap-1 mb-0.5">
+                          <BookOpen size={13} className="text-emerald-400" />
+                          <p className="text-xl font-bold font-mono">{readingCount}</p>
+                        </div>
+                        <p className="text-[9px] uppercase tracking-widest text-white/30 font-semibold">Leyendo</p>
+                      </div>
+                      <div className="w-px h-8 bg-white/[0.06]" />
+                      <div className="text-center">
+                        <div className="flex items-center justify-center gap-1 mb-0.5">
+                          <FileText size={13} className="text-white/40" />
+                          <p className="text-xl font-bold font-mono">{totalPagesRead.toLocaleString()}</p>
+                        </div>
+                        <p className="text-[9px] uppercase tracking-widest text-white/30 font-semibold">Páginas</p>
+                      </div>
+                      {pausedCount > 0 && (
+                        <>
+                          <div className="w-px h-8 bg-white/[0.06]" />
+                          <div className="text-center">
+                            <p className="text-xl font-bold font-mono text-white/30">{pausedCount}</p>
+                            <p className="text-[9px] uppercase tracking-widest text-white/30 font-semibold">Pausados</p>
+                          </div>
+                        </>
                       )}
                     </div>
-                  )}
+                  </>
+                )
+              })()}
+
+              {/* Currently reading list */}
+              {readingNow.length > 0 && (
+                <div className="mb-5">
+                  <p className="text-[10px] uppercase tracking-wider text-white/25 mb-2 px-1">Leyendo ahora</p>
+                  <div className="space-y-1.5">
+                    {readingNow.map((b) => {
+                      const author = authorsById.get(b.authorId)
+                      const read = pagesPerBook[b.id!] || 0
+                      const pct = b.totalPages > 0 ? Math.min(Math.round((read / b.totalPages) * 100), 100) : 0
+                      return (
+                        <button
+                          key={b.id}
+                          type="button"
+                          onClick={() => setDetailBook(b)}
+                          className="glass-card-hover flex items-center justify-between py-2.5 px-4 w-full text-left cursor-pointer active:scale-[0.98] transition-transform focus-visible:ring-2 focus-visible:ring-accent/40"
+                        >
+                          <div className="flex items-center gap-3 min-w-0 flex-1">
+                            {b.coverDataUrl ? (
+                              <img src={b.coverDataUrl} className="w-8 h-8 rounded-lg object-cover shrink-0" />
+                            ) : (
+                              <div className="w-8 h-8 rounded-lg bg-surface-300 flex items-center justify-center shrink-0">
+                                <BookOpen size={14} className="text-white/15" />
+                              </div>
+                            )}
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-medium truncate">{b.title}</p>
+                              {author && <p className="text-[10px] text-white/25 truncate">{author.name}</p>}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0 ml-3">
+                            <div className="w-16">
+                              <ProgressBar value={read} max={b.totalPages} color="bg-emerald-400" height="h-1" />
+                            </div>
+                            <span className="text-[9px] text-white/25 font-mono w-7 text-right">{pct}%</span>
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
                 </div>
               )}
 
@@ -496,16 +580,13 @@ export function BooksPage() {
               ) : (
                 <>
                   <div className={`grid ${gridClass} gap-3 md:gap-4`}>
-                    {visibleBooks.map((b, i) => {
+                    {visibleBooks.map((b) => {
                       const author = authorsById.get(b.authorId)
                       const read = pagesPerBook[b.id!] || 0
                       const pct = b.totalPages > 0 ? Math.min(Math.round((read / b.totalPages) * 100), 100) : 0
                       return (
-                        <motion.div
+                        <div
                           key={b.id}
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: i * 0.03 }}
                           onClick={() => setDetailBook(b)}
                           className="glass-card-hover overflow-hidden cursor-pointer group active:scale-[0.98] transition-transform focus-visible:ring-2 focus-visible:ring-accent/40"
                         >
@@ -536,7 +617,7 @@ export function BooksPage() {
                               <span className="text-[9px] text-white/25 font-mono flex-shrink-0">{pct}%</span>
                             </div>
                           </div>
-                        </motion.div>
+                        </div>
                       )
                     })}
                   </div>
@@ -565,21 +646,19 @@ export function BooksPage() {
             <>
               {/* Stats row */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
-                {statItems.map((s, i) => (
-                  <motion.div
+                {statItems.map((s) => (
+                  <div
                     key={s.label}
-                    initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.05, duration: 0.3 }}
-                    className="glass-card p-3.5 flex items-center gap-3"
+                    className="glass-card p-3 flex items-center gap-3"
                   >
-                    <div className={`w-8 h-8 rounded-xl ${s.bg} flex items-center justify-center flex-shrink-0`}>
+                    <div className={`w-9 h-9 rounded-xl ${s.bg} flex items-center justify-center shrink-0`}>
                       {s.icon}
                     </div>
                     <div className="min-w-0">
-                      <p className="text-[10px] text-white/35 truncate">{s.label}</p>
-                      <p className="text-base font-bold leading-tight">{s.value}</p>
+                      <p className="text-[10px] text-white/30 uppercase tracking-wider font-semibold">{s.label}</p>
+                      <p className="text-lg font-bold tabular-nums leading-tight font-mono">{s.value}</p>
                     </div>
-                  </motion.div>
+                  </div>
                 ))}
               </div>
 
@@ -589,7 +668,7 @@ export function BooksPage() {
                   <button
                     key={tab.id}
                     onClick={() => setChartTab(tab.id)}
-                    className={`flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-full border transition-all ${chartTab === tab.id
+                    className={`flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-full border transition-colors ${chartTab === tab.id
                         ? 'bg-accent/15 border-accent/40 text-accent'
                         : 'border-white/10 text-white/35 hover:border-white/20 hover:text-white/60'
                       }`}

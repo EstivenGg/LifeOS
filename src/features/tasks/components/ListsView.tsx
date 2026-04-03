@@ -39,7 +39,7 @@ export function ListsView({
         <div className="flex items-center gap-1 p-1 bg-surface-100/40 rounded-lg shrink-0 border border-white/[0.02]">
           <button
             onClick={() => setFilter('active')}
-            className={`px-4 py-1.5 rounded-md text-[13px] font-semibold transition-all ${
+            className={`px-4 py-1.5 rounded-md text-[13px] font-semibold transition-colors ${
               filter === 'active'
                 ? 'bg-white/10 text-white shadow-sm'
                 : 'text-white/30 hover:text-white/60'
@@ -49,7 +49,7 @@ export function ListsView({
           </button>
           <button
             onClick={() => setFilter('completed')}
-            className={`px-4 py-1.5 rounded-md text-[13px] font-semibold transition-all ${
+            className={`px-4 py-1.5 rounded-md text-[13px] font-semibold transition-colors ${
               filter === 'completed'
                 ? 'bg-white/10 text-white shadow-sm'
                 : 'text-white/30 hover:text-white/60'
@@ -89,7 +89,7 @@ export function ListsView({
                 <Card 
                   key={l.id} 
                   hover 
-                  className={`group relative overflow-hidden !p-0 cursor-pointer border border-white/[0.05] transition-all hover:border-white/[0.15] ${isCompleted ? 'opacity-70 hover:opacity-100 grayscale-[0.3]' : ''}`}
+                  className={`group relative overflow-hidden !p-0 cursor-pointer border border-white/[0.05] transition-colors hover:border-white/[0.15] ${isCompleted ? 'opacity-70 hover:opacity-100 grayscale-[0.3]' : ''}`}
                   onClick={() => { setSelectedListId(l.id!); setCompletionVisibility(isCompleted ? 'all' : 'active') }}
                 >
                   <div className={`absolute inset-x-0 top-0 h-1 ${isCompleted ? 'opacity-50' : ''}`} style={{ backgroundColor: l.color }} />
@@ -103,7 +103,7 @@ export function ListsView({
                       </div>
                       
                       {/* Hover Actions */}
-                      <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 -mr-2 bg-surface-100/80 backdrop-blur pb-1 rounded-bl-xl pl-2 absolute top-4 right-4 z-10">
+                      <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 -mr-2 bg-surface-100 pb-1 rounded-bl-xl pl-2 absolute top-4 right-4 z-10">
                         {!isCompleted && (
                           <>
                             <button onClick={e => { e.stopPropagation(); openEditList(l) }} className="p-1.5 hover:bg-white/10 rounded-lg transition-colors">
@@ -154,8 +154,8 @@ export function ListsView({
             
             {/* Create new list card (only in 'active' tab) */}
             {filter === 'active' && (
-              <Card className="!p-0 cursor-pointer border-dashed border-2 border-white/10 hover:border-white/20 transition-all flex flex-col items-center justify-center min-h-[160px] bg-transparent hover:bg-white/[0.02]" onClick={openNewList}>
-                <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mb-3 text-white/40 group-hover:text-white/80 group-hover:scale-110 transition-all">
+              <Card className="!p-0 cursor-pointer border-dashed border-2 border-white/10 hover:border-white/20 transition-colors flex flex-col items-center justify-center min-h-[160px] bg-transparent hover:bg-white/[0.02]" onClick={openNewList}>
+                <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mb-3 text-white/40 group-hover:text-white/80 group-hover:scale-110 transition-transform">
                   <Plus size={24} />
                 </div>
                 <span className="text-sm font-semibold text-white/50">Crear nueva lista</span>

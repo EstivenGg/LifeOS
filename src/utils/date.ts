@@ -2,6 +2,9 @@ export function today(): string { return formatDate(new Date()) }
 export function formatDate(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
+export function isDateString(value: unknown): value is string {
+  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
+}
 export function parseDate(s: string): Date { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d) }
 export function addDays(date: string, n: number): string { const d = parseDate(date); d.setDate(d.getDate() + n); return formatDate(d) }
 export function daysAgo(n: number): string { const d = new Date(); d.setDate(d.getDate() - n); return formatDate(d) }

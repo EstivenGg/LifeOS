@@ -465,7 +465,7 @@ export function StudyPage() {
                   <button
                     key={tab.id}
                     onClick={() => setChartTab(tab.id)}
-                    className={`flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-full border transition-all ${
+                    className={`flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-full border transition-colors ${
                       chartTab === tab.id
                         ? 'bg-accent/15 border-accent/40 text-accent'
                         : 'border-white/10 text-white/35 hover:border-white/20 hover:text-white/60'
