@@ -3,8 +3,9 @@ import { FocusNote } from '@/components/ui/FocusNote'
 import { ImageUpload } from '@/components/ui/ImageUpload'
 import { Modal } from '@/components/ui/Modal'
 import { SheetSelect } from '@/components/ui/SheetSelect'
+import { TagPicker } from '@/components/ui/TagPicker'
 import type { MediaItem } from '@/data/types'
-import { MEDIA_FORM_STATUS_OPTIONS } from '../constants'
+import { MEDIA_FORM_STATUS_OPTIONS, MEDIA_SUGGESTED_TAGS } from '../constants'
 
 interface Props {
   open: boolean
@@ -128,15 +129,12 @@ export function MediaFormModal({ open, editing, form, onClose, onChange, onSave 
           rows={2}
         />
 
-        <div>
-          <label className="text-xs text-white/40 mb-1 block">Tags (coma)</label>
-          <input
-            value={form.tags || ''}
-            onChange={event => onChange({ tags: event.target.value })}
-            className="input-field"
-            placeholder="Drama, Thriller"
-          />
-        </div>
+        <TagPicker
+          label="Tags"
+          value={form.tags || ''}
+          onChange={value => onChange({ tags: value })}
+          suggestions={MEDIA_SUGGESTED_TAGS}
+        />
 
         <button
           type="button"

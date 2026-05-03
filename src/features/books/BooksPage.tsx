@@ -14,6 +14,7 @@ import { FocusNote } from '@/components/ui/FocusNote'
 import { ImageUpload } from '@/components/ui/ImageUpload'
 import { GridSelector } from '@/components/ui/GridSelector'
 import { SheetSelect } from '@/components/ui/SheetSelect'
+import { TagPicker } from '@/components/ui/TagPicker'
 import { useGridColumns } from '@/hooks/useGridColumns'
 import { useTheme } from '@/context/ThemeContext'
 import { showSaved } from '@/utils/toast'
@@ -23,6 +24,15 @@ import {
   PieChart, Pie, Cell,
 } from 'recharts'
 import { daysAgo, shortDate, formatDate, parseDate } from '@/utils/date'
+
+const BOOKS_SUGGESTED_TAGS = [
+  'Ficción', 'No-ficción', 'Fantasía', 'Ciencia ficción', 'Misterio', 'Thriller',
+  'Romance', 'Terror', 'Historia', 'Biografía', 'Autobiografía', 'Ensayo',
+  'Poesía', 'Humor', 'Infantil', 'Juvenil',
+  'Productividad', 'Desarrollo personal', 'Negocios', 'Psicología', 'Filosofía',
+  'Política', 'Economía', 'Tecnología', 'Ciencia', 'Arte', 'Espiritualidad', 'Salud',
+  'Clásico', 'Premiado', 'Serie',
+]
 
 type SortBy = 'recent' | 'progress' | 'title' | 'rating'
 type StatusFilter = 'all' | Book['status']
@@ -867,9 +877,12 @@ export function BooksPage() {
           </div>
           <FocusNote value={form.description} onChange={v => setForm(f => ({ ...f, description: v }))} label="Descripción" placeholder="Sinopsis o descripción del libro..." rows={2} />
           <FocusNote value={form.opinion} onChange={v => setForm(f => ({ ...f, opinion: v }))} label="Mi opinión" placeholder="¿Qué opinas del libro?" rows={2} />
-          <div><label className="text-xs text-white/40 mb-1 block">Tags (separados por coma)</label>
-            <input value={form.tags} onChange={e => setForm(f => ({ ...f, tags: e.target.value }))} className="input-field" placeholder="No-ficción, Productividad" />
-          </div>
+          <TagPicker
+            label="Tags"
+            value={form.tags}
+            onChange={v => setForm(f => ({ ...f, tags: v }))}
+            suggestions={BOOKS_SUGGESTED_TAGS}
+          />
           <button onClick={saveBook} disabled={!form.title || !form.authorName} className="btn-primary w-full disabled:opacity-40">
             {editing ? 'Guardar' : 'Crear'}
           </button>

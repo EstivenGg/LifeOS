@@ -7,16 +7,24 @@ import { seedDatabase } from './data/db/seed'
 import { ThemeProvider } from './context/ThemeContext'
 import { SectionPrefsProvider } from './context/SectionPrefsContext'
 
-seedDatabase()
+async function bootstrap() {
+  try {
+    await seedDatabase()
+  } catch (error) {
+    console.error('LifeOS seed failed', error)
+  }
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <ThemeProvider>
-      <SectionPrefsProvider>
-        <BrowserRouter>
-          <App />
-        </BrowserRouter>
-      </SectionPrefsProvider>
-    </ThemeProvider>
-  </React.StrictMode>,
-)
+  ReactDOM.createRoot(document.getElementById('root')!).render(
+    <React.StrictMode>
+      <ThemeProvider>
+        <SectionPrefsProvider>
+          <BrowserRouter>
+            <App />
+          </BrowserRouter>
+        </SectionPrefsProvider>
+      </ThemeProvider>
+    </React.StrictMode>,
+  )
+}
+
+void bootstrap()

@@ -89,3 +89,11 @@ export const MEDIA_TYPE_ICONS: Record<MediaItem['type'], LucideIcon> = {
 export function isMediaStatusFilter(value: string): value is MediaStatusFilter {
   return value === 'all' || value in MEDIA_STATUS_MAP
 }
+
+export const MEDIA_SUGGESTED_TAGS = [
+  'Acción', 'Animación', 'Aventura', 'Anime', 'Biografía',
+  'Ciencia ficción', 'Comedia', 'Crimen', 'Documental', 'Drama',
+  'Fantasía', 'Historia', 'Horror', 'Misterio', 'Musical',
+  'Romance', 'Suspense', 'Terror', 'Thriller', 'Western',
+  'Superhéroes', 'Coreano', 'Indie', 'Clásico', 'Adaptación',
+]
