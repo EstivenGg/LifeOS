@@ -3,7 +3,7 @@ import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
   LineChart, Line, ReferenceLine,
 } from 'recharts'
-import { Moon, Sun, Clock, TrendingUp } from 'lucide-react'
+import { Moon, Sun } from 'lucide-react'
 import { db } from '@/data/db'
 import { Card } from '@/components/ui/Card'
 import { RangeSelector, rangeToDays } from '@/components/ui/RangeSelector'

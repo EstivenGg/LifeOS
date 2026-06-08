@@ -20,7 +20,7 @@ import {
 } from '@dnd-kit/sortable'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { ChevronDown, X, Trash2 } from 'lucide-react'
+import { Trash2 } from 'lucide-react'
 import type { Routine, RoutineExercise, ExerciseCatalog } from '@/data/types'
 
 interface P {
@@ -88,11 +88,6 @@ export function RoutineEditor({
   const [localExercises, setLocalExercises] = useState<RoutineExercise[]>([])
   const [editingExercise, setEditingExercise] = useState<RoutineExercise | null>(null)
   const [showPicker, setShowPicker] = useState(false)
-  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
-    general: true,
-    exercises: true,
-  })
-
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
@@ -165,13 +160,6 @@ export function RoutineEditor({
         // TODO: save sort order to DB
       }
     }
-  }
-
-  const toggleSection = (section: string) => {
-    setExpandedSections(prev => ({
-      ...prev,
-      [section]: !prev[section],
-    }))
   }
 
   return (

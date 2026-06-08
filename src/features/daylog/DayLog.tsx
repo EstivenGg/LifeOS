@@ -59,7 +59,7 @@ function calcSleepHours(bed?: string, wake?: string): number | undefined {
   if (!bed || !wake) return undefined
   const [bh, bm] = bed.split(':').map(Number)
   const [wh, wm] = wake.split(':').map(Number)
-  let bedMin = bh * 60 + bm
+  const bedMin = bh * 60 + bm
   let wakeMin = wh * 60 + wm
   if (wakeMin <= bedMin) wakeMin += 1440
   return Math.round(((wakeMin - bedMin) / 60) * 10) / 10
@@ -351,10 +351,7 @@ export function DayLog() {
   async function rmWk(id: number) { await db.entryWorkouts.delete(id); setEntryWorkouts(p => p.filter(w => w.id !== id)); showSaved() }
 
   // ── Apps ─────────────────────────────────────────────────────────────────────
-  const saveApp = useDebounce(async (u: T.EntryAppUsage) => { await db.entryAppUsage.update(u.id!, { minutes: u.minutes }); showSaved() }, 400)
-  function updApp(id: number, min: number) { setAppUsages(p => p.map(a => { if (a.id === id) { const u = { ...a, minutes: min }; saveApp(u); return u } return a })) }
-  async function rmApp(id: number) { await db.entryAppUsage.delete(id); setAppUsages(p => p.filter(a => a.id !== id)); showSaved() }
-
+  const _saveApp = useDebounce(async (u: T.EntryAppUsage) => { await db.entryAppUsage.update(u.id!, { minutes: u.minutes }); showSaved() }, 400)
   // ── Screen time import ────────────────────────────────────────────────────
   async function importTodayScreenTime(silent = false, targetDate = date) {
     if (!isAndroid) { if (!silent) toast.error('Solo disponible en Android'); return }

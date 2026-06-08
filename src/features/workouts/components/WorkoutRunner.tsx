@@ -1,7 +1,7 @@
 ﻿import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Play, Pause, CheckCircle2, AlertCircle, ChevronLeft, ChevronRight, Plus, Check, Minus, FastForward, ChevronDown } from 'lucide-react'
+import { X, Play, Pause, ChevronLeft, ChevronRight, Plus, Check, Minus, FastForward, ChevronDown } from 'lucide-react'
 import { db } from '@/data/db'
 import toast from 'react-hot-toast'
 import { showSaved } from '@/utils/toast'

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Download, FileSpreadsheet, FileText } from 'lucide-react'
+import { Download, FileSpreadsheet, FileText, Smartphone } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import Papa from 'papaparse'
 import { db } from '@/data/db'
@@ -18,7 +18,7 @@ export function ExportPage() {
     const allHabits = await db.habits.toArray()
     const activeHabits = allHabits.filter(h => h.active)
     const books = await db.books.toArray()
-    const authors = await db.authors.toArray()
+    const _authors = await db.authors.toArray()
     const routines = await db.routines.toArray()
     const platforms = await db.studyPlatforms.toArray()
     const apps = await db.appCatalog.toArray()
@@ -213,6 +213,25 @@ export function ExportPage() {
           <p className="text-xs text-white/30 mt-0.5">JSON, CSV y Excel</p>
         </div>
       </div>
+
+      {/* ── APK Download ─────────────────────────────────────────────────── */}
+      <a
+        href={`${import.meta.env.BASE_URL}lifeos.apk`}
+        download="LifeOS.apk"
+        className="flex items-center gap-4 p-4 mb-5 rounded-2xl bg-green-500/8 border border-green-500/20 active:scale-[0.98] transition-transform"
+      >
+        <div className="w-12 h-12 rounded-2xl bg-green-500/15 flex items-center justify-center shrink-0">
+          <Smartphone size={24} className="text-green-400" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="font-semibold text-sm">App Android (APK)</p>
+          <p className="text-xs text-white/35 mt-0.5">Instalar LifeOS en tu celular</p>
+        </div>
+        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-green-500/15 text-green-400 text-xs font-semibold shrink-0">
+          <Download size={13} />
+          APK
+        </div>
+      </a>
 
       <Card className="mb-5">
         <h3 className="text-sm font-semibold text-white/50 mb-3">Rango de exportación</h3>

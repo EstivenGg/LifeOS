@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { motion } from 'framer-motion'
 import {
   Flame, Dumbbell, TrendingUp, TrendingDown, Trophy,
@@ -34,12 +34,6 @@ interface Insight {
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function estimate1RM(weight: number, reps: number) {
-  if (reps <= 0) return 0
-  if (reps === 1) return weight
-  return Math.round(weight * (1 + reps / 30))
-}
 
 function daysBetween(a: Date, b: Date) {
   return Math.floor(Math.abs(b.getTime() - a.getTime()) / (1000 * 3600 * 24))
@@ -80,7 +74,7 @@ function buildInsights(
   {
     let streak = 0
     const hasToday = workoutDates.has(todayStr)
-    let ptr = new Date(todayDate)
+    const ptr = new Date(todayDate)
     if (!hasToday) ptr.setDate(ptr.getDate() - 1)
     while (true) {
       if (workoutDates.has(formatDate(ptr))) {

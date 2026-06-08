@@ -4,7 +4,7 @@ import { motion } from 'framer-motion'
 import {
   LayoutDashboard, CalendarDays, BookOpen, Dumbbell, Moon, Download,
   ListChecks, PenLine, Scale, Timer, Smartphone, TrendingUp,
-  GraduationCap, Film, LayoutGrid, X, ClipboardList, Droplet, type LucideIcon,
+  GraduationCap, Film, LayoutGrid, X, ClipboardList, type LucideIcon,
 } from 'lucide-react'
 import { ThemeSelector } from '@/components/ui/ThemeSelector'
 import { ResetDataButton } from '@/components/ui/ResetDataButton'

@@ -1,5 +1,4 @@
 import { useCallback } from 'react'
-import { db } from '@/data/db'
 import type * as T from '@/data/types'
 import {
   createDefaultWorkoutSet,

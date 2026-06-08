@@ -73,7 +73,7 @@ export function InsightsPage() {
   const [consistency, setConsistency] = useState(0)
 
   // Fill accent hex into SC
-  const scWithAccent = useMemo(() => ({ ...SC, habits: { ...SC.habits, hex: accentHex } }), [accentHex])
+  const _scWithAccent = useMemo(() => ({ ...SC, habits: { ...SC.habits, hex: accentHex } }), [accentHex])
 
   const load = useCallback(async () => {
     setLoading(true)

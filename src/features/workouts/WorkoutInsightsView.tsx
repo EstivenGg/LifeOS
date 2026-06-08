@@ -113,7 +113,7 @@ export function WorkoutInsightsView({ allWorkouts, catalog, routines, dailyEntri
     const t = today()
     let streak = 0
     const hasToday = workoutDates.has(t)
-    let pointerDate = parseDate(t)
+    const pointerDate = parseDate(t)
     if (!hasToday) {
       pointerDate.setDate(pointerDate.getDate() - 1)
     }

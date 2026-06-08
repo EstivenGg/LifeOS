@@ -83,7 +83,7 @@ function genericSummary(w: T.EntryWorkout): string {
 
 // ─── Collapsible session wrapper ─────────────────────────────────────────────
 function SessionCard({
-  id, open, onToggle, onRemove, header, children,
+  id: _id, open, onToggle, onRemove, header, children,
 }: {
   id: number
   open: boolean
@@ -145,7 +145,7 @@ function SessionCard({
 // ─── Main component ───────────────────────────────────────────────────────────
 export function WorkoutSection({
   entry, isAdv, isHorizontal, entryWorkouts, routines, exerciseCatalog, routineExercises, activityFields, activeSports, workoutDone,
-  onToggleAdv, onUpdate, onStartWorkout, onStartGeneric,
+  onToggleAdv, onUpdate, onStartWorkout: _onStartWorkout, onStartGeneric,
   onUpdGenericWk, onUpdSet, onUpdSideSet, onAddSet, onRmSet, onRmWk, onWorkoutCompleted,
 }: Props) {
   const { unit, kgToDisplay, displayToKg, inputStep } = useWeightUnit()
@@ -156,15 +156,10 @@ export function WorkoutSection({
   function toggleExpand(id: number) {
     setExpandedIds(prev => {
       const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
       return next
     })
-  }
-
-  // Auto-expand newly added sessions
-  function handleStartWorkout(routineId: number) {
-    onStartWorkout(routineId)
-    // will be expanded on next render via the new id — handled below
   }
 
   const activeSportDefs = ACTIVITY_TYPES.filter(act => activeSports.includes(act.type))

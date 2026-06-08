@@ -26,7 +26,7 @@ const tt = {
 function round1(n: number) { return Math.round(n * 10) / 10 }
 
 export function WeightPage() {
-  const { unit, kgToDisplay, fmtWeight } = useWeightUnit()
+  const { unit, kgToDisplay } = useWeightUnit()
   const [data, setData] = useState<Pt[]>([])
   const [cur, setCur] = useState<number | undefined>()
   const [avg, setAvg] = useState(0)

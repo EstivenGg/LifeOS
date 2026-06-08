@@ -249,7 +249,7 @@ export function WorkoutsPage() {
 
   async function addCustomEx(rid: number) {
     if (!newExName.trim()) return
-    let c = catalog.find(x => x.name.toLowerCase() === newExName.trim().toLowerCase())
+    const c = catalog.find(x => x.name.toLowerCase() === newExName.trim().toLowerCase())
     let cid: number
     if (c) cid = c.id!
     else cid = await db.exerciseCatalog.add({ name: newExName.trim(), muscleGroup: 'Otros' }) as number
@@ -291,7 +291,7 @@ export function WorkoutsPage() {
 
   // ── Derived data ──
   const weekSets = useMemo(() => buildWeekSets(allWorkouts), [allWorkouts])
-  const groups = useMemo(() => [...new Set(catalog.map(c => c.muscleGroup))].sort(), [catalog])
+  const _groups = useMemo(() => [...new Set(catalog.map(c => c.muscleGroup))].sort(), [catalog])
 
   const totalWeekSets = weekSets.reduce((s, d) => s + d.sets, 0)
 

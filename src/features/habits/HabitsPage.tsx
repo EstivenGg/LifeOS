@@ -366,7 +366,7 @@ export function HabitsPage() {
 
               {/* Category groups */}
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                {catGroups.map(({ cat, items }, gi) => (
+                {catGroups.map(({ cat, items }, _gi) => (
                   <div key={cat.id} className="mb-5">
                     <p className="text-[10px] uppercase tracking-wider text-white/25 mb-2 px-1">{cat.name}</p>
                     <SortableContext items={items.map(h => h.id!)} strategy={verticalListSortingStrategy}>

@@ -173,7 +173,7 @@ export function BooksPage() {
 
   // ── Quick strip ────────────────────────────────────────────────────────────
   const readingNow = useMemo(() => books.filter(b => b.status === 'reading').slice(0, 3), [books])
-  const lastFinished = useMemo(() => books.filter(b => b.status === 'finished').slice(-1)[0], [books])
+  const _lastFinished = useMemo(() => books.filter(b => b.status === 'finished').slice(-1)[0], [books])
 
   // ── Filter helpers ─────────────────────────────────────────────────────────
   const allTags = useMemo(() => {

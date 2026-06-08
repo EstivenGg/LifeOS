@@ -14,11 +14,6 @@ import { parseDate } from '@/utils/date'
 import { estimateWorkoutSet1RM, getSetDisplayWeight, getSetTotalReps, getSetVolume } from '@/utils/workoutMetrics'
 import { useWeightUnit } from '@/context/SectionPrefsContext'
 
-// ── 1RM (Epley): w * (1 + r/30)
-function estimate1RM(weight: number, reps: number): number {
-  if (reps === 1) return weight
-  return Math.round(weight * (1 + reps / 30))
-}
 
 interface SetDetail {
   reps: number
@@ -313,7 +308,7 @@ export function ExerciseInsightPanel({ allWorkouts, dailyEntries }: Props) {
   // Graph uses filteredSessions
   const graphKey = graph === 'weight' ? 'maxWeight' : graph === 'volume' ? 'totalVolume' : 'best1RM'
   const graphColor = graph === 'volume' ? '#a855f7' : graph === '1rm' ? '#22d3ee' : '#f97316'
-  const graphUnit = graph === 'volume' ? `${unit} vol` : unit
+  const _graphUnit = graph === 'volume' ? `${unit} vol` : unit
   const graphLabel = graph === 'weight' ? 'Peso máx' : graph === 'volume' ? 'Volumen' : '1RM est.'
 
   // Display-converted sessions for chart
@@ -359,7 +354,7 @@ export function ExerciseInsightPanel({ allWorkouts, dailyEntries }: Props) {
     let best = 0
     let bestLabel = ''
     filteredSessions.forEach(s => {
-      let bw = weightMap.get(s.date)
+      const bw = weightMap.get(s.date)
       if (bw == null) return
       const maxW = s.maxWeight
       if (maxW > 0 && bw > 0) {

@@ -220,7 +220,7 @@ export function getWeightColumnLabel(exercise?: ExerciseMeta | null, unit: 'kg' 
   return getExerciseLoadMode(exercise) === 'per_hand' ? `${u}/mano` : u
 }
 
-export function getNextWeightColumnLabel(exercise?: ExerciseMeta | null, unit: 'kg' | 'lbs' = 'kg') {
+export function getNextWeightColumnLabel(exercise?: ExerciseMeta | null, _unit: 'kg' | 'lbs' = 'kg') {
   return getExerciseLoadMode(exercise) === 'per_hand' ? 'Próx/mano' : 'Próx'
 }
 

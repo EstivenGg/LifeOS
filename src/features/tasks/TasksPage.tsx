@@ -1,21 +1,18 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
 import {
   Plus, FolderOpen,
-  ChevronDown, ChevronRight, Circle, Clock, CheckCircle2,
-  CalendarDays, Tag, Trash2, Pencil,
-  X, Square, SquareCheckBig, ListTodo,
-  AlertTriangle, Repeat, Copy,
+  ChevronRight,
+  CalendarDays, Trash2, Pencil,
+  ListTodo,
+  AlertTriangle,
   CheckCheck, SlidersHorizontal, ClipboardList,
 } from 'lucide-react'
 import { db } from '@/data/db'
-import type { Task, TaskList, TaskStatus, ListTemplate } from '@/data/types'
+import type { Task, TaskList, TaskStatus } from '@/data/types'
 import { Modal, Card, EmptyState, SheetSelect, DatePicker } from '@/components/ui'
 import { showSaved } from '@/utils/toast'
 import {
-  addDays,
-  addMonths,
   deleteFutureRecurringInstances,
   deleteTaskSeries,
   loadTaskCollections,
@@ -25,7 +22,7 @@ import {
 } from './taskOperations'
 import { ListsView } from './components/ListsView'
 
-import { STATUS_CFG, LIST_COLORS, RECURRENCE_OPTIONS, SORT_OPTIONS, TASK_FOCUS_FILTER_OPTIONS, RECURRENCE_EDIT_SCOPE_OPTIONS, ViewTab, SortMode, CompletionVisibility, TaskFocusFilter, RecurrenceEditScope, parseQuickCapture } from './constants'
+import { LIST_COLORS, RECURRENCE_OPTIONS, SORT_OPTIONS, TASK_FOCUS_FILTER_OPTIONS, RECURRENCE_EDIT_SCOPE_OPTIONS, ViewTab, SortMode, CompletionVisibility, TaskFocusFilter, RecurrenceEditScope, parseQuickCapture } from './constants'
 import { TaskDetail } from './components/TaskDetail'
 import { TaskRow } from './components/TaskRow'
 
@@ -489,7 +486,7 @@ export function TasksPage() {
 
   /* ─── Stats ─────────────────────────────────────────────────────────── */
 
-  const stats = useMemo(() => {
+  const _stats = useMemo(() => {
     const active = tasks.filter(t => !t.parentId)
     const td = todayStr()
     return {

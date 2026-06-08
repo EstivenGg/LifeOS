@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { FolderOpen, Plus, Pencil, Trash2, CheckCheck, CalendarDays, RotateCcw } from 'lucide-react'
+import { FolderOpen, Plus, Pencil, Trash2, CheckCheck, CalendarDays } from 'lucide-react'
 import type { TaskList } from '@/data/types'
 import { Card, EmptyState } from '@/components/ui'
 import { todayStr } from '../taskOperations'

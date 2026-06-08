@@ -1,11 +1,10 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
-import { X, PenLine, CheckCircle2, ListChecks, BookOpen, Dumbbell, Brain, Smartphone, GraduationCap, Moon, Timer, Droplets, Scale, Smile, Meh, Frown, Laugh, Activity, Bike, Mountain, Footprints, Flame, Trophy, Waves } from 'lucide-react'
+import { X, PenLine, CheckCircle2, BookOpen, Dumbbell, Smile, Meh, Frown, Laugh, Activity, Bike, Mountain, Footprints, Trophy, Waves } from 'lucide-react'
 import { db } from '@/data/db'
 import { useSectionPrefs, SectionId, useWeightUnit } from '@/context/SectionPrefsContext'
 import { formatPace, formatSpeed } from '@/utils/date'
-import type * as T from '@/data/types'
 import { WORKOUT_SIDES, isUnilateralExercise, normalizeWorkoutSet } from '@/utils/workoutMetrics'
 
 const SLEEP_QUALITY: Record<number, { label: string, color: string }> = {
@@ -114,7 +113,7 @@ export function DashboardModal({ isOpen, onClose, date, metric, icon: Icon, colo
         if (!data) return <div className="py-10 text-center"><div className="animate-spin w-6 h-6 border-2 border-accent border-t-transparent inset-0 mx-auto rounded-full" /></div>
 
         if (metric!.id === 'habits') {
-            const { habits, entryHabits, categories } = data
+            const { habits, entryHabits } = data
             const doneIds = new Set(entryHabits.filter((e: any) => e.done).map((e: any) => e.habitId))
             const doneH = habits.filter((h: any) => doneIds.has(h.id))
             const missedH = habits.filter((h: any) => !doneIds.has(h.id))
@@ -350,7 +349,7 @@ export function DashboardModal({ isOpen, onClose, date, metric, icon: Icon, colo
         }
 
         if (metric!.id === 'study') {
-            const { studies, platforms, entry } = data
+            const { studies, platforms } = data
             if (!isAdv) {
                 if (!studies.length) return <p className="text-sm text-center text-white/40 py-4">Sin registro básico.</p>
                 return (

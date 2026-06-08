@@ -1,3 +1,9 @@
 node_modules
 .claude/
 .codex/
+dist/
+tsconfig.tsbuildinfo
+android/.idea/deploymentTargetSelector.xml
+coverage/
+playwright-report/
+test-results/

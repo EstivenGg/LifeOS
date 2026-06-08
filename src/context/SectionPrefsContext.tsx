@@ -2,7 +2,6 @@ import { createContext, useContext, useState, useCallback, useMemo, ReactNode } 
 import {
   Smile, ListChecks, Moon, Droplets, Smartphone,
   GraduationCap, BookOpen, Dumbbell, Timer, Brain, Scale,
-  type LucideIcon,
 } from 'lucide-react'
 
 export const SECTION_DEFS = [
@@ -89,11 +88,6 @@ const Ctx = createContext<SectionPrefsCtx | null>(null)
 
 export function SectionPrefsProvider({ children }: { children: ReactNode }) {
   const [prefs, setPrefs] = useState(loadPrefs)
-
-  const save = useCallback((next: ReturnType<typeof loadPrefs>) => {
-    setPrefs(next)
-    localStorage.setItem('lifeos-section-prefs', JSON.stringify(next))
-  }, [])
 
   const toggle = useCallback((id: SectionId) => {
     setPrefs(prev => {

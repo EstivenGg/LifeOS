@@ -265,7 +265,7 @@ export function ScreenTimePage() {
   const maxTicks = chartData.length > 14 ? 6 : undefined
 
   const list = showAllApps ? todayUsage : todayUsage.slice(0, 4)
-  const sumList = todayUsage.reduce((s, u) => s + u.minutes, 0)
+  const _sumList = todayUsage.reduce((s, u) => s + u.minutes, 0)
   const canGoNext = selectedDate < today()
 
   const [view, setView] = useState<'detail' | 'insights'>('detail')

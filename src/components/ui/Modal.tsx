@@ -29,6 +29,9 @@ export function Modal({ open, onClose, title, children, size = 'md' }: P) {
 
           {/* Panel — slides up on mobile, fades on desktop */}
           <motion.div
+            role="dialog"
+            aria-modal="true"
+            aria-label={title}
             initial={{ opacity: 0, y: 40 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 40 }}
